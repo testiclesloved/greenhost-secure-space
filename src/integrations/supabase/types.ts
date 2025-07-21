@@ -14,7 +14,234 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      admin_settings: {
+        Row: {
+          id: string
+          setting_key: string
+          setting_value: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          setting_key: string
+          setting_value: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          setting_key?: string
+          setting_value?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          first_name: string | null
+          id: string
+          last_name: string | null
+          role: Database["public"]["Enums"]["user_role"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      storage_accounts: {
+        Row: {
+          account_email: string
+          account_password: string
+          created_at: string
+          id: string
+          purchase_id: string
+          setup_completed: boolean
+          storage_quota_gb: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_email: string
+          account_password: string
+          created_at?: string
+          id?: string
+          purchase_id: string
+          setup_completed?: boolean
+          storage_quota_gb: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_email?: string
+          account_password?: string
+          created_at?: string
+          id?: string
+          purchase_id?: string
+          setup_completed?: boolean
+          storage_quota_gb?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "storage_accounts_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "user_purchases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      storage_plans: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          monthly_fee: number
+          name: string
+          one_time_fee: number | null
+          plan_type: Database["public"]["Enums"]["storage_plan_type"]
+          storage_gb: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          monthly_fee: number
+          name: string
+          one_time_fee?: number | null
+          plan_type: Database["public"]["Enums"]["storage_plan_type"]
+          storage_gb: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          monthly_fee?: number
+          name?: string
+          one_time_fee?: number | null
+          plan_type?: Database["public"]["Enums"]["storage_plan_type"]
+          storage_gb?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      storage_users: {
+        Row: {
+          created_at: string
+          id: string
+          password: string
+          sftp_link: string | null
+          storage_account_id: string
+          username: string
+          web_link: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          password: string
+          sftp_link?: string | null
+          storage_account_id: string
+          username: string
+          web_link?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          password?: string
+          sftp_link?: string | null
+          storage_account_id?: string
+          username?: string
+          web_link?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "storage_users_storage_account_id_fkey"
+            columns: ["storage_account_id"]
+            isOneToOne: false
+            referencedRelation: "storage_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_purchases: {
+        Row: {
+          account_number: string | null
+          admin_confirmed: boolean
+          amount_paid: number
+          company_email: string | null
+          created_at: string
+          id: string
+          payment_status: Database["public"]["Enums"]["payment_status"]
+          sftpgo_api_key: string | null
+          storage_plan_id: string
+          storage_setup_completed: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_number?: string | null
+          admin_confirmed?: boolean
+          amount_paid: number
+          company_email?: string | null
+          created_at?: string
+          id?: string
+          payment_status?: Database["public"]["Enums"]["payment_status"]
+          sftpgo_api_key?: string | null
+          storage_plan_id: string
+          storage_setup_completed?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_number?: string | null
+          admin_confirmed?: boolean
+          amount_paid?: number
+          company_email?: string | null
+          created_at?: string
+          id?: string
+          payment_status?: Database["public"]["Enums"]["payment_status"]
+          sftpgo_api_key?: string | null
+          storage_plan_id?: string
+          storage_setup_completed?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_purchases_storage_plan_id_fkey"
+            columns: ["storage_plan_id"]
+            isOneToOne: false
+            referencedRelation: "storage_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +250,9 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      payment_status: "pending" | "confirmed" | "failed"
+      storage_plan_type: "personal" | "enterprise" | "custom"
+      user_role: "user" | "admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +379,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      payment_status: ["pending", "confirmed", "failed"],
+      storage_plan_type: ["personal", "enterprise", "custom"],
+      user_role: ["user", "admin"],
+    },
   },
 } as const
