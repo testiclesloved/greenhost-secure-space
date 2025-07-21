@@ -34,6 +34,10 @@ export const Auth = () => {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (formData.password.length > 72) {
+      alert("Password must be 72 characters or less!");
+      return;
+    }
     setLoading(true);
     await signIn(formData.email, formData.password);
     setLoading(false);
@@ -43,6 +47,10 @@ export const Auth = () => {
     e.preventDefault();
     if (formData.password !== formData.confirmPassword) {
       alert("Passwords don't match!");
+      return;
+    }
+    if (formData.password.length > 72) {
+      alert("Password must be 72 characters or less!");
       return;
     }
     setLoading(true);
@@ -89,10 +97,6 @@ export const Auth = () => {
             <CardTitle>Get Started</CardTitle>
             <CardDescription>
               Sign in to your account or create a new one to access your storage plans.
-              <br />
-              <span className="text-xs text-muted-foreground mt-2 block">
-                Admin users (emzywoo89@gmail.com) will be automatically set up on first login.
-              </span>
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -123,6 +127,7 @@ export const Auth = () => {
                       type="password"
                       value={formData.password}
                       onChange={handleInputChange}
+                      maxLength={72}
                       required
                     />
                   </div>
@@ -171,13 +176,14 @@ export const Auth = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signup-password">Password</Label>
+                    <Label htmlFor="signup-password">Password (max 72 characters)</Label>
                     <Input
                       id="signup-password"
                       name="password"
                       type="password"
                       value={formData.password}
                       onChange={handleInputChange}
+                      maxLength={72}
                       required
                     />
                   </div>
@@ -189,6 +195,7 @@ export const Auth = () => {
                       type="password"
                       value={formData.confirmPassword}
                       onChange={handleInputChange}
+                      maxLength={72}
                       required
                     />
                   </div>
