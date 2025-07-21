@@ -1,15 +1,15 @@
 import { useState, useEffect } from "react";
-import { useParams, Navigate } from "react-router-dom";
+import { useParams, Navigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Header } from "@/components/Header";
+import { Navigation } from "@/components/Navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Shield, Check, AlertTriangle } from "lucide-react";
+import { Loader2, Shield, Check, AlertTriangle, ArrowLeft } from "lucide-react";
 
 interface StoragePlan {
   id: string;
@@ -120,16 +120,22 @@ export const Checkout = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-hero">
-      <Header />
-      
-      <div className="container mx-auto px-4 pt-24">
-        <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-background">
+      <Navigation />
+      <div className="pt-20 pb-8">
+        <div className="container mx-auto px-4 max-w-4xl">
+          <div className="mb-6">
+            <Link to="/" className="inline-flex items-center text-muted-foreground hover:text-primary transition-colors">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Plans
+            </Link>
+          </div>
+          
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-white mb-4">
+            <h1 className="text-4xl font-bold mb-4">
               Complete Your Purchase
             </h1>
-            <p className="text-xl text-white/80">
+            <p className="text-xl text-muted-foreground">
               Secure your cloud storage with GreenHost
             </p>
           </div>

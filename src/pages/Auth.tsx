@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -58,7 +58,21 @@ export const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-hero flex flex-col">
+      <div className="w-full">
+        <div className="container mx-auto px-4 h-16 flex items-center">
+          <Link to="/" className="flex items-center space-x-3 text-white hover:text-white/80 transition-colors">
+            <img 
+              src="/lovable-uploads/57a44abd-e943-4884-bfc5-c53ecaf9bddc.png" 
+              alt="GreenHost Logo" 
+              className="h-8 w-8 rounded-full shadow-medium"
+            />
+            <span className="text-lg font-bold">← Back to Home</span>
+          </Link>
+        </div>
+      </div>
+      
+      <div className="flex-1 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <img 
@@ -75,6 +89,10 @@ export const Auth = () => {
             <CardTitle>Get Started</CardTitle>
             <CardDescription>
               Sign in to your account or create a new one to access your storage plans.
+              <br />
+              <span className="text-xs text-muted-foreground mt-2 block">
+                Admin users (emzywoo89@gmail.com) will be automatically set up on first login.
+              </span>
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -188,6 +206,7 @@ export const Auth = () => {
           </CardContent>
         </Card>
       </div>
+    </div>
     </div>
   );
 };

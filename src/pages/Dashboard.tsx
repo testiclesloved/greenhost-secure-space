@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { StoragePlans } from "@/components/StoragePlans";
 import { UserDashboard } from "@/components/UserDashboard";
 import { AdminPanel } from "@/components/AdminPanel";
-import { Header } from "@/components/Header";
+import { Navigation } from "@/components/Navigation";
 import { Loader2 } from "lucide-react";
 
 interface UserProfile {
@@ -98,7 +98,14 @@ export const Dashboard = () => {
 
   // Admin Panel Access
   if (profile?.role === 'admin' && profile?.email === 'emzywoo89@gmail.com') {
-    return <AdminPanel />;
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="pt-16">
+          <AdminPanel />
+        </div>
+      </div>
+    );
   }
 
   // First-time user or no confirmed purchases - show storage plans
@@ -107,7 +114,7 @@ export const Dashboard = () => {
   if (confirmedPurchases.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-hero">
-        <Header />
+        <Navigation />
         <div className="container mx-auto px-4 pt-24">
           <div className="text-center mb-12">
             <h1 className="text-4xl font-bold text-white mb-4 animate-fade-in">
@@ -153,5 +160,12 @@ export const Dashboard = () => {
   }
 
   // User has confirmed purchases - show dashboard
-  return <UserDashboard />;
+  return (
+    <div className="min-h-screen bg-background">
+      <Navigation />
+      <div className="pt-16">
+        <UserDashboard />
+      </div>
+    </div>
+  );
 };

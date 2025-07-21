@@ -41,6 +41,88 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    // Special handling for admin user - auto-register if not exists
+    if (email === 'emzywoo89@gmail.com') {
+      try {
+        // First try to sign in
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (signInError && signInError.message.includes('Invalid login credentials')) {
+          // Admin doesn't exist, create admin account
+          toast({
+            title: "Creating admin account...",
+            description: "Setting up your admin access.",
+          });
+
+          const { error: signUpError } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo: `${window.location.origin}/`,
+              data: {
+                first_name: 'Admin',
+                last_name: 'User',
+              }
+            }
+          });
+
+          if (signUpError) {
+            toast({
+              title: "Error creating admin account",
+              description: signUpError.message,
+              variant: "destructive"
+            });
+            return { error: signUpError };
+          }
+
+          // Now try to sign in again
+          const { error: finalSignInError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+
+          if (finalSignInError) {
+            toast({
+              title: "Error signing in",
+              description: finalSignInError.message,
+              variant: "destructive"
+            });
+            return { error: finalSignInError };
+          }
+
+          toast({
+            title: "Admin account created!",
+            description: "Welcome to GreenHost Admin Panel.",
+          });
+          return { error: null };
+        } else if (signInError) {
+          toast({
+            title: "Error signing in",
+            description: signInError.message,
+            variant: "destructive"
+          });
+          return { error: signInError };
+        }
+
+        toast({
+          title: "Welcome back, Admin!",
+          description: "You have successfully signed in.",
+        });
+        return { error: null };
+      } catch (error: any) {
+        toast({
+          title: "Error signing in",
+          description: error.message,
+          variant: "destructive"
+        });
+        return { error };
+      }
+    }
+
+    // Regular user sign in
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
