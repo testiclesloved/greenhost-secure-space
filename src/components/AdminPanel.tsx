@@ -98,7 +98,7 @@ export const AdminPanel = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPendingPurchases(data || []);
+      setPendingPurchases((data as any) || []);
     } catch (error) {
       console.error('Error fetching pending purchases:', error);
     } finally {
@@ -269,10 +269,10 @@ export const AdminPanel = () => {
                         <div className="flex justify-between items-start mb-4">
                           <div>
                             <h3 className="font-semibold text-lg">
-                              {purchase.profiles.email}
+                              {purchase.profiles?.email || 'No email'}
                             </h3>
                             <p className="text-sm text-muted-foreground">
-                              {purchase.profiles.first_name} {purchase.profiles.last_name}
+                              {purchase.profiles?.first_name} {purchase.profiles?.last_name}
                             </p>
                           </div>
                           <Badge variant="secondary">
@@ -283,11 +283,11 @@ export const AdminPanel = () => {
                         <div className="grid grid-cols-2 gap-4 mb-4">
                           <div>
                             <p className="text-sm font-medium">Plan</p>
-                            <p className="text-lg">{purchase.storage_plans.name}</p>
+                            <p className="text-lg">{purchase.storage_plans?.name || 'No plan'}</p>
                           </div>
                           <div>
                             <p className="text-sm font-medium">Storage</p>
-                            <p className="text-lg">{purchase.storage_plans.storage_gb}GB</p>
+                            <p className="text-lg">{purchase.storage_plans?.storage_gb || 0}GB</p>
                           </div>
                           <div>
                             <p className="text-sm font-medium">Amount</p>

@@ -40,7 +40,7 @@ export const Checkout = () => {
       const { data, error } = await supabase
         .from('storage_plans')
         .select('*')
-        .eq('plan_type', planType)
+        .eq('plan_type', planType as any)
         .single();
 
       if (error) throw error;
