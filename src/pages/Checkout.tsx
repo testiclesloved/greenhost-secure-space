@@ -32,17 +32,22 @@ export const Checkout = () => {
   useEffect(() => {
     if (planType) {
       fetchPlan();
+    } else {
+      console.log('No planType provided, redirecting to dashboard');
+      setLoading(false);
     }
   }, [planType]);
 
   const fetchPlan = async () => {
     try {
+      console.log('Fetching plan for planType:', planType);
       const { data, error } = await supabase
         .from('storage_plans')
         .select('*')
         .eq('plan_type', planType as any)
         .single();
 
+      console.log('Plan fetch result:', { data, error });
       if (error) throw error;
       setPlan(data);
     } catch (error) {
