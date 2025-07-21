@@ -18,11 +18,21 @@ export const Hero = () => {
               lightning-fast speeds, and seamless collaboration tools.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Button variant="glass" size="xl" className="hover-lift">
+              <Button 
+                variant="glass" 
+                size="xl" 
+                className="hover-lift"
+                onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
+              >
                 <Cloud className="w-5 h-5 mr-2" />
-                Start Free Trial
+                View Storage Plans
               </Button>
-              <Button variant="outline" size="xl" className="bg-white/10 border-white/30 text-white hover:bg-white/20">
+              <Button 
+                variant="outline" 
+                size="xl" 
+                className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+                onClick={() => window.location.href = '/security'}
+              >
                 <Shield className="w-5 h-5 mr-2" />
                 View Security
               </Button>

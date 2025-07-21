@@ -321,12 +321,11 @@ export const Checkout = () => {
                   </Button>
 
                   <div className="text-center">
-                    <Button 
-                      variant="link" 
-                      onClick={() => window.location.href = 'mailto:emzywoo89@gmail.com?subject=GreenHost Consultation Request'}
-                    >
-                      Book a consultation instead
-                    </Button>
+                    <Link to="/consultation">
+                      <Button variant="link">
+                        Book a consultation instead
+                      </Button>
+                    </Link>
                   </div>
                 </div>
               </CardContent>

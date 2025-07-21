@@ -224,6 +224,26 @@ export const AdminPanel = () => {
     }
 
     try {
+      // Find the purchase with user email
+      const purchase = pendingPurchases.find(p => p.id === purchaseId);
+      if (!purchase?.profiles?.email) {
+        throw new Error('Purchase or user email not found');
+      }
+
+      // Call edge function to setup storage
+      const { data: setupResult, error: setupError } = await supabase.functions.invoke('setup-storage', {
+        body: {
+          purchaseId: purchaseId,
+          userEmail: purchase.profiles.email
+        }
+      });
+
+      if (setupError) {
+        console.error('Setup storage error:', setupError);
+        // Continue with payment confirmation even if storage setup fails
+      }
+
+      // Update purchase status
       const { error } = await supabase
         .from('user_purchases')
         .update({
@@ -236,10 +256,13 @@ export const AdminPanel = () => {
 
       toast({
         title: "Payment confirmed",
-        description: "User has been granted access to their storage plan",
+        description: setupResult?.success 
+          ? "User has been granted access to their storage plan and SFTPGo account created"
+          : "Payment confirmed, but storage setup may need manual intervention",
       });
 
       fetchPendingPurchases();
+      fetchUserStats();
     } catch (error) {
       console.error('Error confirming payment:', error);
       toast({

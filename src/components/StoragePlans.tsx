@@ -85,8 +85,8 @@ export const StoragePlans = () => {
 
   const handlePlanSelect = (plan: StoragePlan) => {
     if (plan.plan_type === "custom") {
-      // Redirect to email for appointment booking
-      window.location.href = "mailto:support@greenhost.com?subject=Custom Plan Consultation&body=I'm interested in the Custom plan. Please schedule a consultation to discuss my requirements.";
+      // Redirect to consultation page
+      navigate("/consultation");
     } else {
       // Use React Router navigation instead of window.location
       navigate(`/checkout/${plan.plan_type}`);
