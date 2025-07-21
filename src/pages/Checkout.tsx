@@ -16,8 +16,15 @@ interface StoragePlan {
   name: string;
   storage_gb: number;
   monthly_fee: number;
+  one_time_fee: number;
   description: string;
   plan_type: string;
+}
+
+interface AdminSettings {
+  bank_name: string;
+  account_number: string;
+  account_name: string;
 }
 
 export const Checkout = () => {
@@ -27,16 +34,37 @@ export const Checkout = () => {
   const [plan, setPlan] = useState<StoragePlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
-  const [accountNumber, setAccountNumber] = useState('');
+  const [adminSettings, setAdminSettings] = useState<AdminSettings | null>(null);
 
   useEffect(() => {
     if (planType) {
       fetchPlan();
+      fetchAdminSettings();
     } else {
       console.log('No planType provided, redirecting to dashboard');
       setLoading(false);
     }
   }, [planType]);
+
+  const fetchAdminSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('admin_settings')
+        .select('setting_key, setting_value')
+        .in('setting_key', ['bank_name', 'account_number', 'account_name']);
+
+      if (error) throw error;
+      
+      const settingsObj: any = {};
+      data?.forEach(setting => {
+        settingsObj[setting.setting_key] = setting.setting_value;
+      });
+      
+      setAdminSettings(settingsObj);
+    } catch (error) {
+      console.error('Error fetching admin settings:', error);
+    }
+  };
 
   const fetchPlan = async () => {
     try {
@@ -74,26 +102,18 @@ export const Checkout = () => {
 
   const handlePurchase = async () => {
     if (!plan || !user) return;
-    
-    if (!accountNumber.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter your account number",
-        variant: "destructive"
-      });
-      return;
-    }
 
     setProcessing(true);
     
     try {
+      const totalAmount = plan.monthly_fee + (plan.one_time_fee || 0);
+      
       const { error } = await supabase
         .from('user_purchases')
         .insert({
           user_id: user.id,
           storage_plan_id: plan.id,
-          amount_paid: plan.monthly_fee,
-          account_number: accountNumber,
+          amount_paid: totalAmount,
           payment_status: 'pending'
         });
 
@@ -172,13 +192,20 @@ export const Checkout = () => {
                   <div className="flex justify-between items-center p-3 bg-gradient-card rounded-lg">
                     <span className="font-medium">Storage Space</span>
                     <Badge variant="secondary" className="text-lg">
-                      {plan.storage_gb}GB+
+                      {plan.storage_gb}GB
                     </Badge>
                   </div>
                   
                   <div className="flex justify-between items-center p-3 bg-gradient-card rounded-lg">
-                    <span className="font-medium">Monthly Fee</span>
-                    <span className="text-2xl font-bold text-primary">
+                    <span className="font-medium">One-time Setup Fee</span>
+                    <span className="text-xl font-bold text-primary">
+                      ₦{(plan.one_time_fee || 0).toLocaleString()}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center p-3 bg-gradient-card rounded-lg">
+                    <span className="font-medium">Monthly Maintenance</span>
+                    <span className="text-xl font-bold text-primary">
                       ₦{plan.monthly_fee.toLocaleString()}
                     </span>
                   </div>
@@ -242,19 +269,25 @@ export const Checkout = () => {
                 </div>
 
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="accountNumber">Bank Account Number</Label>
-                    <Input
-                      id="accountNumber"
-                      value={accountNumber}
-                      onChange={(e) => setAccountNumber(e.target.value)}
-                      placeholder="Enter your account number for verification"
-                      required
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      This will be used for payment verification purposes only
-                    </p>
-                  </div>
+                  {adminSettings && (
+                    <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                      <h3 className="font-semibold mb-2 text-blue-900 dark:text-blue-100">Payment Details</h3>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-blue-800 dark:text-blue-200">Bank Name:</span>
+                          <span className="font-medium text-blue-900 dark:text-blue-100">{adminSettings.bank_name}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-blue-800 dark:text-blue-200">Account Number:</span>
+                          <span className="font-medium text-blue-900 dark:text-blue-100">{adminSettings.account_number}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-blue-800 dark:text-blue-200">Account Name:</span>
+                          <span className="font-medium text-blue-900 dark:text-blue-100">{adminSettings.account_name}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="bg-gradient-card p-4 rounded-lg">
                     <h3 className="font-semibold mb-2">Payment Summary</h3>
@@ -264,14 +297,17 @@ export const Checkout = () => {
                         <span>₦{plan.monthly_fee.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Setup Fee</span>
-                        <span className="text-green-600">FREE</span>
+                        <span>Space Amount (One-time payment)</span>
+                        <span>₦{(plan.one_time_fee || 0).toLocaleString()}</span>
                       </div>
                       <hr />
                       <div className="flex justify-between font-bold text-lg">
                         <span>Total Amount</span>
-                        <span>₦{plan.monthly_fee.toLocaleString()}</span>
+                        <span>₦{(plan.monthly_fee + (plan.one_time_fee || 0)).toLocaleString()}</span>
                       </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        *Monthly maintenance fee of ₦{plan.monthly_fee.toLocaleString()} will be billed monthly after initial payment
+                      </p>
                     </div>
                   </div>
 

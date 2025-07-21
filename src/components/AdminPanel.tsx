@@ -35,6 +35,9 @@ interface AdminSettings {
   sftpgo_encryption_key: string;
   sftpgo_tunnel_url: string;
   admin_key: string;
+  bank_name: string;
+  account_number: string;
+  account_name: string;
 }
 
 interface StoragePlan {
@@ -42,9 +45,17 @@ interface StoragePlan {
   name: string;
   storage_gb: number;
   monthly_fee: number;
+  one_time_fee: number;
   description: string;
   plan_type: "personal" | "enterprise" | "custom";
   is_active: boolean;
+}
+
+interface UserStats {
+  total_users: number;
+  total_purchases: number;
+  confirmed_purchases: number;
+  pending_purchases: number;
 }
 
 export const AdminPanel = () => {
@@ -58,18 +69,70 @@ export const AdminPanel = () => {
     zerotier_network_id: '',
     sftpgo_encryption_key: '',
     sftpgo_tunnel_url: '',
-    admin_key: ''
+    admin_key: '',
+    bank_name: '',
+    account_number: '',
+    account_name: ''
   });
   const [storagePlans, setStoragePlans] = useState<StoragePlan[]>([]);
   const [editingPlan, setEditingPlan] = useState<string | null>(null);
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [isAddingPlan, setIsAddingPlan] = useState(false);
+  const [newPlan, setNewPlan] = useState<Partial<StoragePlan>>({
+    name: '',
+    storage_gb: 0,
+    monthly_fee: 0,
+    one_time_fee: 0,
+    description: '',
+    plan_type: 'personal',
+    is_active: true
+  });
 
   useEffect(() => {
     if (isAuthenticated) {
       fetchPendingPurchases();
       fetchAdminSettings();
       fetchStoragePlans();
+      fetchUserStats();
     }
   }, [isAuthenticated]);
+
+  const fetchUserStats = async () => {
+    try {
+      // Count total users
+      const { count: totalUsers } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+
+      // Count total purchases
+      const { count: totalPurchases } = await supabase
+        .from('user_purchases')
+        .select('*', { count: 'exact', head: true });
+
+      // Count confirmed purchases
+      const { count: confirmedPurchases } = await supabase
+        .from('user_purchases')
+        .select('*', { count: 'exact', head: true })
+        .eq('admin_confirmed', true)
+        .eq('payment_status', 'confirmed');
+
+      // Count pending purchases
+      const { count: pendingPurchases } = await supabase
+        .from('user_purchases')
+        .select('*', { count: 'exact', head: true })
+        .eq('admin_confirmed', false)
+        .eq('payment_status', 'pending');
+
+      setUserStats({
+        total_users: totalUsers || 0,
+        total_purchases: totalPurchases || 0,
+        confirmed_purchases: confirmedPurchases || 0,
+        pending_purchases: pendingPurchases || 0
+      });
+    } catch (error) {
+      console.error('Error fetching user stats:', error);
+    }
+  };
 
   const handleAdminAuth = async () => {
     const correctKey = 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8S9t0U1v2W3x4Y5z6A7b8C9d0E1f2G3h4I5j6K7l8M9n0O1p2Q3r4S5t6U7v8W9x0Y1z2A3b4C5d6E7f8G9h0I1j2K3l4M5n6O7p8Q9r0S1t2U3v4W5x6Y7z8';
@@ -229,6 +292,61 @@ export const AdminPanel = () => {
     }
   };
 
+  const createStoragePlan = async () => {
+    try {
+      // Validate required fields
+      if (!newPlan.name || !newPlan.monthly_fee || !newPlan.storage_gb || !newPlan.plan_type) {
+        toast({
+          title: "Error",
+          description: "Please fill in all required fields",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const planData = {
+        name: newPlan.name,
+        storage_gb: newPlan.storage_gb,
+        monthly_fee: newPlan.monthly_fee,
+        one_time_fee: newPlan.one_time_fee || 0,
+        description: newPlan.description || '',
+        plan_type: newPlan.plan_type as "personal" | "enterprise" | "custom",
+        is_active: newPlan.is_active ?? true
+      };
+
+      const { error } = await supabase
+        .from('storage_plans')
+        .insert([planData]);
+
+      if (error) throw error;
+
+      await fetchStoragePlans();
+
+      toast({
+        title: "Plan created",
+        description: "New storage plan has been created successfully",
+      });
+
+      setIsAddingPlan(false);
+      setNewPlan({
+        name: '',
+        storage_gb: 0,
+        monthly_fee: 0,
+        one_time_fee: 0,
+        description: '',
+        plan_type: 'personal',
+        is_active: true
+      });
+    } catch (error) {
+      console.error('Error creating storage plan:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create storage plan",
+        variant: "destructive"
+      });
+    }
+  };
+
   const updateSettings = async () => {
     try {
       for (const [key, value] of Object.entries(settings)) {
@@ -299,6 +417,11 @@ export const AdminPanel = () => {
             <TabsTrigger value="payments" className="flex items-center gap-2">
               <DollarSign className="w-4 h-4" />
               Payments
+              {userStats?.pending_purchases && userStats.pending_purchases > 0 && (
+                <Badge variant="destructive" className="ml-2 text-xs">
+                  {userStats.pending_purchases}
+                </Badge>
+              )}
             </TabsTrigger>
             <TabsTrigger value="plans" className="flex items-center gap-2">
               <Edit3 className="w-4 h-4" />
@@ -389,12 +512,99 @@ export const AdminPanel = () => {
           <TabsContent value="plans" className="mt-6">
             <Card>
               <CardHeader>
-                <CardTitle>Storage Plans Management</CardTitle>
-                <CardDescription>
-                  Edit storage plan pricing and details
-                </CardDescription>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>Storage Plans Management</CardTitle>
+                    <CardDescription>
+                      Edit storage plan pricing and details
+                    </CardDescription>
+                  </div>
+                  <Button 
+                    onClick={() => setIsAddingPlan(true)}
+                    className="bg-gradient-primary"
+                  >
+                    Add New Plan
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
+                {isAddingPlan && (
+                  <Card className="mb-6 border-primary">
+                    <CardHeader>
+                      <CardTitle className="text-lg">Create New Plan</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Plan Name</Label>
+                          <Input
+                            value={newPlan.name || ''}
+                            onChange={(e) => setNewPlan(prev => ({ ...prev, name: e.target.value }))}
+                            placeholder="e.g., Professional Plan"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Plan Type</Label>
+                          <select
+                            className="w-full p-2 border rounded"
+                            value={newPlan.plan_type || 'personal'}
+                            onChange={(e) => setNewPlan(prev => ({ ...prev, plan_type: e.target.value as any }))}
+                          >
+                            <option value="personal">Personal</option>
+                            <option value="enterprise">Enterprise</option>
+                            <option value="custom">Custom</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <Label>Storage (GB)</Label>
+                          <Input
+                            type="number"
+                            value={newPlan.storage_gb || 0}
+                            onChange={(e) => setNewPlan(prev => ({ ...prev, storage_gb: Number(e.target.value) }))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Monthly Fee (₦)</Label>
+                          <Input
+                            type="number"
+                            value={newPlan.monthly_fee || 0}
+                            onChange={(e) => setNewPlan(prev => ({ ...prev, monthly_fee: Number(e.target.value) }))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>One-time Fee (₦)</Label>
+                          <Input
+                            type="number"
+                            value={newPlan.one_time_fee || 0}
+                            onChange={(e) => setNewPlan(prev => ({ ...prev, one_time_fee: Number(e.target.value) }))}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Description</Label>
+                        <Input
+                          value={newPlan.description || ''}
+                          onChange={(e) => setNewPlan(prev => ({ ...prev, description: e.target.value }))}
+                          placeholder="Plan description"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button onClick={createStoragePlan} className="bg-gradient-success">
+                          Create Plan
+                        </Button>
+                        <Button 
+                          onClick={() => setIsAddingPlan(false)} 
+                          variant="outline"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                
                 <div className="space-y-4">
                   {storagePlans.map((plan) => (
                     <div key={plan.id} className="border rounded-lg p-4">
@@ -419,7 +629,7 @@ export const AdminPanel = () => {
 
                       {editingPlan === plan.id ? (
                         <div className="space-y-4 border-t pt-4">
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-3 gap-4">
                             <div className="space-y-2">
                               <Label>Monthly Fee (₦)</Label>
                               <Input
@@ -429,6 +639,21 @@ export const AdminPanel = () => {
                                   const newPlans = storagePlans.map(p => 
                                     p.id === plan.id 
                                       ? { ...p, monthly_fee: Number(e.target.value) }
+                                      : p
+                                  );
+                                  setStoragePlans(newPlans);
+                                }}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>One-time Fee (₦)</Label>
+                              <Input
+                                type="number"
+                                value={plan.one_time_fee || 0}
+                                onChange={(e) => {
+                                  const newPlans = storagePlans.map(p => 
+                                    p.id === plan.id 
+                                      ? { ...p, one_time_fee: Number(e.target.value) }
                                       : p
                                   );
                                   setStoragePlans(newPlans);
@@ -469,6 +694,7 @@ export const AdminPanel = () => {
                             <Button
                               onClick={() => updateStoragePlan(plan.id, {
                                 monthly_fee: plan.monthly_fee,
+                                one_time_fee: plan.one_time_fee,
                                 storage_gb: plan.storage_gb,
                                 description: plan.description
                               })}
@@ -491,7 +717,7 @@ export const AdminPanel = () => {
                           </div>
                         </div>
                       ) : (
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-4 gap-4">
                           <div>
                             <p className="text-sm font-medium">Storage</p>
                             <p className="text-lg">{plan.storage_gb}GB</p>
@@ -499,6 +725,10 @@ export const AdminPanel = () => {
                           <div>
                             <p className="text-sm font-medium">Monthly Fee</p>
                             <p className="text-lg">₦{plan.monthly_fee.toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">One-time Fee</p>
+                            <p className="text-lg">₦{(plan.one_time_fee || 0).toLocaleString()}</p>
                           </div>
                           <div>
                             <p className="text-sm font-medium">Plan Type</p>
@@ -514,73 +744,170 @@ export const AdminPanel = () => {
           </TabsContent>
 
           <TabsContent value="users" className="mt-6">
+            <div className="grid gap-6 mb-6">
+              <div className="grid grid-cols-4 gap-4">
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <Users className="w-8 h-8 text-primary" />
+                      <div>
+                        <h3 className="text-2xl font-bold">{userStats?.total_users || 0}</h3>
+                        <p className="text-sm text-muted-foreground">Total Users</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <DollarSign className="w-8 h-8 text-green-600" />
+                      <div>
+                        <h3 className="text-2xl font-bold">{userStats?.confirmed_purchases || 0}</h3>
+                        <p className="text-sm text-muted-foreground">Active Subscriptions</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <Loader2 className="w-8 h-8 text-yellow-600" />
+                      <div>
+                        <h3 className="text-2xl font-bold">{userStats?.pending_purchases || 0}</h3>
+                        <p className="text-sm text-muted-foreground">Pending Payments</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <DollarSign className="w-8 h-8 text-blue-600" />
+                      <div>
+                        <h3 className="text-2xl font-bold">{userStats?.total_purchases || 0}</h3>
+                        <p className="text-sm text-muted-foreground">Total Purchases</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+            
             <Card>
               <CardHeader>
                 <CardTitle>User Management</CardTitle>
                 <CardDescription>
-                  View and manage user accounts and storage allocations
+                  Detailed user management features coming soon...
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <p className="text-center py-8 text-muted-foreground">
-                  User management features coming soon...
+                  Advanced user management interface will be available in the next update.
                 </p>
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="settings" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>System Settings</CardTitle>
-                <CardDescription>
-                  Configure ZeroTier network and SFTPGo integration
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Payment Details</CardTitle>
+                  <CardDescription>
+                    Configure bank account information for user payments
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="bankName">Bank Name</Label>
+                      <Input
+                        id="bankName"
+                        value={settings.bank_name}
+                        onChange={(e) => setSettings(prev => ({
+                          ...prev,
+                          bank_name: e.target.value
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="accountNumber">Account Number</Label>
+                      <Input
+                        id="accountNumber"
+                        value={settings.account_number}
+                        onChange={(e) => setSettings(prev => ({
+                          ...prev,
+                          account_number: e.target.value
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="accountName">Account Name</Label>
+                      <Input
+                        id="accountName"
+                        value={settings.account_name}
+                        onChange={(e) => setSettings(prev => ({
+                          ...prev,
+                          account_name: e.target.value
+                        }))}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle>System Settings</CardTitle>
+                  <CardDescription>
+                    Configure ZeroTier network and SFTPGo integration
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="zerotier">ZeroTier Network ID</Label>
+                      <Input
+                        id="zerotier"
+                        value={settings.zerotier_network_id}
+                        onChange={(e) => setSettings(prev => ({
+                          ...prev,
+                          zerotier_network_id: e.target.value
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="tunnel">SFTPGo Tunnel URL</Label>
+                      <Input
+                        id="tunnel"
+                        value={settings.sftpgo_tunnel_url}
+                        onChange={(e) => setSettings(prev => ({
+                          ...prev,
+                          sftpgo_tunnel_url: e.target.value
+                        }))}
+                      />
+                    </div>
+                  </div>
+                  
                   <div className="space-y-2">
-                    <Label htmlFor="zerotier">ZeroTier Network ID</Label>
+                    <Label htmlFor="encryption">SFTPGo Encryption Key</Label>
                     <Input
-                      id="zerotier"
-                      value={settings.zerotier_network_id}
+                      id="encryption"
+                      type="password"
+                      value={settings.sftpgo_encryption_key}
                       onChange={(e) => setSettings(prev => ({
                         ...prev,
-                        zerotier_network_id: e.target.value
+                        sftpgo_encryption_key: e.target.value
                       }))}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="tunnel">SFTPGo Tunnel URL</Label>
-                    <Input
-                      id="tunnel"
-                      value={settings.sftpgo_tunnel_url}
-                      onChange={(e) => setSettings(prev => ({
-                        ...prev,
-                        sftpgo_tunnel_url: e.target.value
-                      }))}
-                    />
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="encryption">SFTPGo Encryption Key</Label>
-                  <Input
-                    id="encryption"
-                    type="password"
-                    value={settings.sftpgo_encryption_key}
-                    onChange={(e) => setSettings(prev => ({
-                      ...prev,
-                      sftpgo_encryption_key: e.target.value
-                    }))}
-                  />
-                </div>
 
-                <Button onClick={updateSettings} className="bg-gradient-primary">
-                  Save Settings
-                </Button>
-              </CardContent>
-            </Card>
+                  <Button onClick={updateSettings} className="bg-gradient-primary">
+                    Save All Settings
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </div>

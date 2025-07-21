@@ -34,6 +34,10 @@ export const Auth = () => {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (formData.password.length < 6) {
+      alert("Password must be at least 6 characters!");
+      return;
+    }
     if (formData.password.length > 72) {
       alert("Password must be 72 characters or less!");
       return;
@@ -47,6 +51,10 @@ export const Auth = () => {
     e.preventDefault();
     if (formData.password !== formData.confirmPassword) {
       alert("Passwords don't match!");
+      return;
+    }
+    if (formData.password.length < 6) {
+      alert("Password must be at least 6 characters!");
       return;
     }
     if (formData.password.length > 72) {
@@ -127,6 +135,7 @@ export const Auth = () => {
                       type="password"
                       value={formData.password}
                       onChange={handleInputChange}
+                      minLength={6}
                       maxLength={72}
                       required
                     />
@@ -176,13 +185,14 @@ export const Auth = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signup-password">Password (max 72 characters)</Label>
+                    <Label htmlFor="signup-password">Password (6-72 characters)</Label>
                     <Input
                       id="signup-password"
                       name="password"
                       type="password"
                       value={formData.password}
                       onChange={handleInputChange}
+                      minLength={6}
                       maxLength={72}
                       required
                     />
