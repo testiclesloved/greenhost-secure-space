@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Check, X, Settings, Users, DollarSign } from "lucide-react";
+import { Loader2, Check, X, Settings, Users, DollarSign, Edit3, Save } from "lucide-react";
 import { Header } from "./Header";
 
 interface PendingPurchase {
@@ -37,6 +37,16 @@ interface AdminSettings {
   admin_key: string;
 }
 
+interface StoragePlan {
+  id: string;
+  name: string;
+  storage_gb: number;
+  monthly_fee: number;
+  description: string;
+  plan_type: "personal" | "enterprise" | "custom";
+  is_active: boolean;
+}
+
 export const AdminPanel = () => {
   const { signOut } = useAuth();
   const { toast } = useToast();
@@ -50,11 +60,14 @@ export const AdminPanel = () => {
     sftpgo_tunnel_url: '',
     admin_key: ''
   });
+  const [storagePlans, setStoragePlans] = useState<StoragePlan[]>([]);
+  const [editingPlan, setEditingPlan] = useState<string | null>(null);
 
   useEffect(() => {
     if (isAuthenticated) {
       fetchPendingPurchases();
       fetchAdminSettings();
+      fetchStoragePlans();
     }
   }, [isAuthenticated]);
 
@@ -78,15 +91,11 @@ export const AdminPanel = () => {
 
   const fetchPendingPurchases = async () => {
     try {
+      // Join with profiles using user_id relationship
       const { data, error } = await supabase
         .from('user_purchases')
         .select(`
           *,
-          profiles (
-            email,
-            first_name,
-            last_name
-          ),
           storage_plans (
             name,
             storage_gb,
@@ -98,7 +107,21 @@ export const AdminPanel = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPendingPurchases((data as any) || []);
+
+      // Fetch profiles separately and merge
+      const userIds = (data || []).map(purchase => purchase.user_id);
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('user_id, email, first_name, last_name')
+        .in('user_id', userIds);
+
+      // Merge profiles data
+      const purchasesWithProfiles = (data || []).map(purchase => ({
+        ...purchase,
+        profiles: profiles?.find(profile => profile.user_id === purchase.user_id) || null
+      }));
+
+      setPendingPurchases(purchasesWithProfiles as any);
     } catch (error) {
       console.error('Error fetching pending purchases:', error);
     } finally {
@@ -159,6 +182,49 @@ export const AdminPanel = () => {
       toast({
         title: "Error",
         description: "Failed to confirm payment",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const fetchStoragePlans = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('storage_plans')
+        .select('*')
+        .order('storage_gb', { ascending: true });
+
+      if (error) throw error;
+      setStoragePlans(data || []);
+    } catch (error) {
+      console.error('Error fetching storage plans:', error);
+    }
+  };
+
+  const updateStoragePlan = async (planId: string, updates: Partial<StoragePlan>) => {
+    try {
+      const { error } = await supabase
+        .from('storage_plans')
+        .update(updates)
+        .eq('id', planId);
+
+      if (error) throw error;
+
+      setStoragePlans(prev => prev.map(plan => 
+        plan.id === planId ? { ...plan, ...updates } : plan
+      ));
+
+      toast({
+        title: "Plan updated",
+        description: "Storage plan has been updated successfully",
+      });
+
+      setEditingPlan(null);
+    } catch (error) {
+      console.error('Error updating storage plan:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update storage plan",
         variant: "destructive"
       });
     }
@@ -230,10 +296,14 @@ export const AdminPanel = () => {
         </div>
 
         <Tabs defaultValue="payments" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="payments" className="flex items-center gap-2">
               <DollarSign className="w-4 h-4" />
               Payments
+            </TabsTrigger>
+            <TabsTrigger value="plans" className="flex items-center gap-2">
+              <Edit3 className="w-4 h-4" />
+              Plans
             </TabsTrigger>
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="w-4 h-4" />
@@ -313,6 +383,133 @@ export const AdminPanel = () => {
                     ))}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="plans" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Storage Plans Management</CardTitle>
+                <CardDescription>
+                  Edit storage plan pricing and details
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {storagePlans.map((plan) => (
+                    <div key={plan.id} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h3 className="font-semibold text-lg">{plan.name}</h3>
+                          <p className="text-sm text-muted-foreground">{plan.description}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={plan.is_active ? "default" : "secondary"}>
+                            {plan.is_active ? "Active" : "Inactive"}
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setEditingPlan(editingPlan === plan.id ? null : plan.id)}
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {editingPlan === plan.id ? (
+                        <div className="space-y-4 border-t pt-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Monthly Fee (₦)</Label>
+                              <Input
+                                type="number"
+                                value={plan.monthly_fee}
+                                onChange={(e) => {
+                                  const newPlans = storagePlans.map(p => 
+                                    p.id === plan.id 
+                                      ? { ...p, monthly_fee: Number(e.target.value) }
+                                      : p
+                                  );
+                                  setStoragePlans(newPlans);
+                                }}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Storage (GB)</Label>
+                              <Input
+                                type="number"
+                                value={plan.storage_gb}
+                                onChange={(e) => {
+                                  const newPlans = storagePlans.map(p => 
+                                    p.id === plan.id 
+                                      ? { ...p, storage_gb: Number(e.target.value) }
+                                      : p
+                                  );
+                                  setStoragePlans(newPlans);
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Description</Label>
+                            <Input
+                              value={plan.description || ''}
+                              onChange={(e) => {
+                                const newPlans = storagePlans.map(p => 
+                                  p.id === plan.id 
+                                    ? { ...p, description: e.target.value }
+                                    : p
+                                );
+                                setStoragePlans(newPlans);
+                              }}
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={() => updateStoragePlan(plan.id, {
+                                monthly_fee: plan.monthly_fee,
+                                storage_gb: plan.storage_gb,
+                                description: plan.description
+                              })}
+                              className="bg-gradient-success"
+                              size="sm"
+                            >
+                              <Save className="w-4 h-4 mr-2" />
+                              Save Changes
+                            </Button>
+                            <Button
+                              onClick={() => {
+                                setEditingPlan(null);
+                                fetchStoragePlans(); // Reset changes
+                              }}
+                              variant="outline"
+                              size="sm"
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-3 gap-4">
+                          <div>
+                            <p className="text-sm font-medium">Storage</p>
+                            <p className="text-lg">{plan.storage_gb}GB</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">Monthly Fee</p>
+                            <p className="text-lg">₦{plan.monthly_fee.toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">Plan Type</p>
+                            <p className="text-lg capitalize">{plan.plan_type}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

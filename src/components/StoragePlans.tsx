@@ -65,9 +65,9 @@ export const StoragePlans = () => {
       // Redirect to email for appointment booking
       window.location.href = "mailto:support@greenhost.com?subject=Custom Plan Consultation&body=I'm interested in the Custom 10TB+ plan. Please schedule a consultation to discuss my requirements.";
     } else {
-      // Redirect to checkout page
-      console.log(`Proceeding to checkout for ${planName} plan`);
-      // This will be implemented later with proper routing
+      // Redirect to checkout page with plan type
+      const planType = planName.toLowerCase();
+      window.location.href = `/checkout/${planType}`;
     }
   };
 
