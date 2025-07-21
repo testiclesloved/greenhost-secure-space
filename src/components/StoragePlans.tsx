@@ -1,75 +1,107 @@
+import { useState, useEffect } from "react";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check, Crown, Zap, Mail } from "lucide-react";
+import { Check, Crown, ArrowRight } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+
+interface StoragePlan {
+  id: string;
+  name: string;
+  storage_gb: number;
+  monthly_fee: number;
+  description: string;
+  plan_type: string;
+  one_time_fee?: number;
+}
 
 export const StoragePlans = () => {
-  const plans = [
-    {
-      name: "Personal",
-      storage: "500GB+",
-      price: "₦15,000",
-      period: "/month",
-      description: "Perfect for individuals and small projects",
-      features: [
-        "500GB+ storage space",
-        "One-time disk purchase",
-        "₦15,000 monthly internet & maintenance",
-        "Personal file management",
-        "Basic support",
-        "Web & mobile access"
-      ],
-      popular: false,
-      variant: "hero" as const
-    },
-    {
-      name: "Enterprise",
-      storage: "1TB+",
-      price: "₦15,000",
-      period: "/month",
-      description: "Ideal for growing businesses and teams",
-      features: [
-        "1TB+ storage space",
-        "Advanced file sharing",
-        "₦15,000 monthly internet & maintenance",
-        "Team collaboration tools",
-        "Priority support",
-        "Advanced security features",
-        "API access"
-      ],
-      popular: true,
-      variant: "premium" as const
-    },
-    {
-      name: "Custom",
-      storage: "10TB+",
-      price: "Custom",
-      period: "pricing",
-      description: "Tailored solutions for large organizations",
-      features: [
-        "10TB+ storage space",
+  const [plans, setPlans] = useState<StoragePlan[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchPlans();
+  }, []);
+
+  const fetchPlans = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('storage_plans')
+        .select('*')
+        .eq('is_active', true)
+        .order('storage_gb', { ascending: true });
+
+      if (error) throw error;
+      setPlans(data || []);
+    } catch (error) {
+      console.error('Error fetching plans:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load storage plans",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getFeatures = (plan: StoragePlan) => {
+    const baseFeatures = [
+      `${plan.storage_gb}GB storage space`,
+      "SFTP/Web access",
+      "24/7 monitoring",
+      "Data encryption",
+      "Regular backups"
+    ];
+
+    if (plan.plan_type === 'enterprise') {
+      return [
+        ...baseFeatures,
+        "Dedicated support team",
+        "Custom configuration",
+        "White-label options",
+        "Enterprise SLA"
+      ];
+    }
+
+    if (plan.plan_type === 'custom') {
+      return [
+        `${plan.storage_gb}TB+ storage space`,
         "Custom configuration",
         "Dedicated support team",
         "White-label options",
         "Enterprise SLA",
         "Custom integrations",
         "On-premise deployment"
-      ],
-      popular: false,
-      variant: "success" as const
+      ];
     }
-  ];
 
-  const handlePlanSelect = (planName: string) => {
-    if (planName === "Custom") {
+    return baseFeatures;
+  };
+
+  const handlePlanSelect = (plan: StoragePlan) => {
+    if (plan.plan_type === "custom") {
       // Redirect to email for appointment booking
-      window.location.href = "mailto:support@greenhost.com?subject=Custom Plan Consultation&body=I'm interested in the Custom 10TB+ plan. Please schedule a consultation to discuss my requirements.";
+      window.location.href = "mailto:support@greenhost.com?subject=Custom Plan Consultation&body=I'm interested in the Custom plan. Please schedule a consultation to discuss my requirements.";
     } else {
       // Redirect to checkout page with plan type
-      const planType = planName.toLowerCase();
-      window.location.href = `/checkout/${planType}`;
+      window.location.href = `/checkout/${plan.plan_type}`;
     }
   };
+
+  if (loading) {
+    return (
+      <section id="pricing" className="py-20 bg-gradient-card">
+        <div className="container mx-auto px-4">
+          <div className="text-center">
+            <div className="animate-pulse">Loading plans...</div>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section id="pricing" className="py-20 bg-gradient-card">
@@ -84,78 +116,60 @@ export const StoragePlans = () => {
         </div>
 
         <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          {plans.map((plan, index) => (
-            <Card 
-              key={plan.name} 
-              className={`relative p-6 hover-lift shadow-soft animate-slide-up ${
-                plan.popular ? 'border-primary shadow-medium' : ''
-              }`}
-              style={{ animationDelay: `${index * 0.2}s` }}
-            >
-              {plan.popular && (
-                <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-gradient-primary">
-                  <Crown className="w-3 h-3 mr-1" />
-                  Most Popular
-                </Badge>
-              )}
-              
-              <CardHeader className="text-center">
-                <CardTitle className="text-2xl font-bold">{plan.name}</CardTitle>
-                <CardDescription className="text-muted-foreground">{plan.description}</CardDescription>
-                <div className="mt-4">
-                  <div className="text-3xl font-bold text-primary">{plan.storage}</div>
-                  <div className="text-lg text-foreground">
-                    {plan.price}
-                    <span className="text-sm text-muted-foreground">{plan.period}</span>
+          {plans.map((plan, index) => {
+            const features = getFeatures(plan);
+            const isPopular = plan.plan_type === 'enterprise';
+            
+            return (
+              <Card 
+                key={plan.id} 
+                className={`relative p-6 hover-lift shadow-soft animate-slide-up ${
+                  isPopular ? 'border-primary shadow-medium' : ''
+                }`}
+                style={{ animationDelay: `${index * 0.2}s` }}
+              >
+                {isPopular && (
+                  <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-gradient-primary">
+                    <Crown className="w-3 h-3 mr-1" />
+                    Most Popular
+                  </Badge>
+                )}
+                
+                <div className="text-center mb-6">
+                  <h3 className="text-2xl font-bold text-foreground mb-2">{plan.name}</h3>
+                  <div className="text-3xl font-bold text-primary mb-2">
+                    {plan.plan_type === 'custom' ? 'Contact us' : `₦${plan.monthly_fee.toLocaleString()}`}
                   </div>
+                  <p className="text-muted-foreground text-sm">
+                    {plan.plan_type === 'custom' ? 'Custom pricing' : 'per month'}
+                  </p>
+                  <p className="text-muted-foreground mt-3">{plan.description}</p>
                 </div>
-              </CardHeader>
 
-              <CardContent>
-                <ul className="space-y-3">
-                  {plan.features.map((feature, i) => (
-                    <li key={i} className="flex items-start space-x-3">
-                      <Check className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-foreground">{feature}</span>
+                <ul className="space-y-3 mb-8">
+                  {features.map((feature, featureIndex) => (
+                    <li key={featureIndex} className="flex items-center text-sm">
+                      <Check className="w-4 h-4 text-primary mr-2 flex-shrink-0" />
+                      <span className="text-muted-foreground">{feature}</span>
                     </li>
                   ))}
                 </ul>
-              </CardContent>
 
-              <CardFooter>
                 <Button 
-                  variant={plan.variant} 
-                  size="lg" 
-                  className="w-full"
-                  onClick={() => handlePlanSelect(plan.name)}
+                  onClick={() => handlePlanSelect(plan)}
+                  className={`w-full group ${
+                    isPopular 
+                      ? 'bg-gradient-primary hover:opacity-90' 
+                      : 'bg-gradient-secondary hover:opacity-90'
+                  }`}
+                  variant={isPopular ? "default" : "outline"}
                 >
-                  {plan.name === "Custom" ? (
-                    <>
-                      <Mail className="w-4 h-4 mr-2" />
-                      Book Consultation
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="w-4 h-4 mr-2" />
-                      Get Started
-                    </>
-                  )}
+                  {plan.plan_type === 'custom' ? 'Contact Sales' : 'Get Started'}
+                  <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Button>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
-
-        <div className="text-center mt-12 animate-fade-in">
-          <p className="text-muted-foreground">
-            All plans include our secure ZeroTier networking and 24/7 support.
-          </p>
-          <p className="text-sm text-muted-foreground mt-2">
-            Not sure which plan is right for you? 
-            <a href="mailto:support@greenhost.com" className="text-primary hover:underline ml-1">
-              Contact us for personalized recommendations
-            </a>
-          </p>
+              </Card>
+            );
+          })}
         </div>
       </div>
     </section>
