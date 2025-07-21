@@ -45,11 +45,21 @@ export const Checkout = () => {
         .from('storage_plans')
         .select('*')
         .eq('plan_type', planType as any)
-        .single();
+        .maybeSingle();
 
       console.log('Plan fetch result:', { data, error });
       if (error) throw error;
-      setPlan(data);
+      
+      if (data) {
+        setPlan(data);
+      } else {
+        console.log('No plan found for planType:', planType);
+        toast({
+          title: "Plan not found",
+          description: `No storage plan found for type: ${planType}`,
+          variant: "destructive"
+        });
+      }
     } catch (error) {
       console.error('Error fetching plan:', error);
       toast({

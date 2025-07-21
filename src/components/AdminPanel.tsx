@@ -210,9 +210,8 @@ export const AdminPanel = () => {
 
       if (error) throw error;
 
-      setStoragePlans(prev => prev.map(plan => 
-        plan.id === planId ? { ...plan, ...updates } : plan
-      ));
+      // Refresh storage plans from database to ensure consistency
+      await fetchStoragePlans();
 
       toast({
         title: "Plan updated",
