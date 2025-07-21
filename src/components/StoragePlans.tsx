@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +21,7 @@ export const StoragePlans = () => {
   const [plans, setPlans] = useState<StoragePlan[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchPlans();
@@ -86,8 +88,8 @@ export const StoragePlans = () => {
       // Redirect to email for appointment booking
       window.location.href = "mailto:support@greenhost.com?subject=Custom Plan Consultation&body=I'm interested in the Custom plan. Please schedule a consultation to discuss my requirements.";
     } else {
-      // Redirect to checkout page with plan type
-      window.location.href = `/checkout/${plan.plan_type}`;
+      // Use React Router navigation instead of window.location
+      navigate(`/checkout/${plan.plan_type}`);
     }
   };
 
