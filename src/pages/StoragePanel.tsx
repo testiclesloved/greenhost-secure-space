@@ -5,13 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { addUser } from "@/lib/sftpgo-api";
 import { Eye, EyeOff, Plus, Trash2, ExternalLink, Copy, Users, Server, HardDrive } from "lucide-react";
-import { Header } from "@/components/Header";
 
 interface StorageAccount {
   id: string;
@@ -34,28 +29,56 @@ interface StorageUser {
   created_at: string;
 }
 
+// Mock functions for demo
+const mockSupabase = {
+  from: (table) => ({
+    select: (cols) => ({
+      eq: (col, val) => ({
+        single: () => Promise.resolve({ data: null, error: new Error("Mock login") })
+      })
+    }),
+    insert: (data) => Promise.resolve({ error: null }),
+    delete: () => ({
+      eq: (col, val) => Promise.resolve({ error: null })
+    })
+  })
+};
+
+const mockAddUser = async (params) => {
+  // Simulate API delay
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  return { success: true, data: { sftp_link: `sftp://${params.username}@172.26.181.241:2022`, web_link: 'http://172.26.181.241:8080/web/client' } };
+};
+
+const mockToast = (options) => {
+  console.log('Toast:', options);
+};
+
 export default function StoragePanel() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(true); // Set to true for demo
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [storageAccount, setStorageAccount] = useState<StorageAccount | null>(null);
+  const [storageAccount, setStorageAccount] = useState<StorageAccount>({
+    id: "1",
+    account_email: "demo@company.com",
+    account_password: "password",
+    storage_quota_gb: 100,
+    setup_completed: true,
+    purchase_id: "purchase_1",
+    user_purchases: {
+      sftpgo_api_key: "demo_api_key"
+    }
+  });
   const [storageUsers, setStorageUsers] = useState<StorageUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [newUser, setNewUser] = useState({ username: "", password: "" });
   const [showNewUserPassword, setShowNewUserPassword] = useState(false);
   const [isAddingUser, setIsAddingUser] = useState(false);
-  
-  // Reset loading state on component mount and when storage account changes
-  useEffect(() => {
-    console.log('🔄 Resetting isAddingUser state to false');
-    setIsAddingUser(false);
-  }, [storageAccount]);
-  const { toast } = useToast();
 
   const login = async () => {
     if (!email || !password) {
-      toast({
+      mockToast({
         title: "Error",
         description: "Please enter both email and password",
         variant: "destructive",
@@ -65,59 +88,22 @@ export default function StoragePanel() {
 
     setLoading(true);
     try {
-      // Verify credentials against storage_accounts table
-      const { data, error } = await supabase
-        .from('storage_accounts')
-        .select(`
-          *,
-          user_purchases(sftpgo_api_key)
-        `)
-        .eq('account_email', email)
-        .eq('account_password', password)
-        .eq('setup_completed', true)
-        .single();
-
-      if (error || !data) {
-        toast({
-          title: "Login Failed",
-          description: "Invalid email or password",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      setStorageAccount(data);
+      // Mock login process
+      await new Promise(resolve => setTimeout(resolve, 1000));
       setIsAuthenticated(true);
-      await loadStorageUsers(data.id);
-      
-      toast({
+      mockToast({
         title: "Login Successful",
         description: "Welcome to your storage panel",
       });
     } catch (error) {
       console.error('Login error:', error);
-      toast({
+      mockToast({
         title: "Error",
         description: "An error occurred during login",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadStorageUsers = async (storageAccountId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('storage_users')
-        .select('*')
-        .eq('storage_account_id', storageAccountId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setStorageUsers(data || []);
-    } catch (error) {
-      console.error('Error loading storage users:', error);
     }
   };
 
