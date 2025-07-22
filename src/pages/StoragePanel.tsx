@@ -124,6 +124,40 @@ export default function StoragePanel() {
     setNewUser({ ...newUser, password });
   };
 
+  const downloadUserData = (username: string, password: string, companyEmail: string) => {
+    const userData = `Company Storage Access Details
+====================================
+
+Company Email: ${companyEmail}
+Username: ${username}
+Password: ${password}
+
+Login Instructions:
+------------------
+1. To access your company storage dashboard, visit our website and login with these credentials
+2. For direct SFTP access, use: sftp://${username}@172.26.181.241:2022
+3. For web interface access, visit: http://172.26.181.241:8080/web/client
+
+Important Security Notice:
+-------------------------
+- Keep these credentials secure and do not share them
+- You must be connected to our ZeroTier network to access storage
+- Contact your administrator if you need assistance
+
+Generated on: ${new Date().toLocaleString()}
+`;
+
+    const blob = new Blob([userData], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `your_data_from_${companyEmail.replace(/[^a-zA-Z0-9]/g, '_')}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  };
+
   const addNewUser = async () => {
     if (!newUser.username || !newUser.password) {
       toast({
@@ -138,6 +172,8 @@ export default function StoragePanel() {
 
     setIsAddingUser(true);
     try {
+      console.log('🚀 Creating user via SFTPGo API...');
+      
       // Call SFTPGo API to add user
       const response = await addUser({
         company_email: storageAccount.account_email,
@@ -146,8 +182,10 @@ export default function StoragePanel() {
         password: newUser.password,
       });
 
+      console.log('📥 SFTPGo response:', response);
+
       if (response.success) {
-        // Extract data from nested response structure
+        // Extract data from nested response structure (response.data.data)
         const userData = response.data?.data || response.data;
         
         // Save user to database
@@ -157,18 +195,22 @@ export default function StoragePanel() {
             storage_account_id: storageAccount.id,
             username: newUser.username,
             password: newUser.password,
-            sftp_link: userData.sftp_link || `sftp://${newUser.username}@server:2022`,
-            web_link: userData.web_link || 'http://server:8080/web/client',
+            sftp_link: userData.sftp_link || `sftp://${newUser.username}@172.26.181.241:2022`,
+            web_link: userData.web_link || 'http://172.26.181.241:8080/web/client',
           });
 
         if (error) throw error;
 
         await loadStorageUsers(storageAccount.id);
+        
+        // Download user data file
+        downloadUserData(newUser.username, newUser.password, storageAccount.account_email);
+        
         setNewUser({ username: "", password: "" });
         
         toast({
-          title: "User Added",
-          description: `User ${newUser.username} has been created successfully`,
+          title: "User Created Successfully",
+          description: `User ${newUser.username} has been created and credentials downloaded`,
         });
       } else {
         throw new Error(response.message || 'Failed to create user');
@@ -411,69 +453,110 @@ export default function StoragePanel() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Username</TableHead>
-                      <TableHead>Password</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {storageUsers.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell className="font-medium">{user.username}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <code className="text-sm bg-gray-100 px-2 py-1 rounded">
-                              {user.password}
-                            </code>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => copyToClipboard(user.password)}
-                            >
-                              <Copy className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {new Date(user.created_at).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button size="sm" variant="destructive">
-                                <Trash2 className="h-3 w-3 mr-1" />
-                                Delete
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>Delete User</DialogTitle>
-                                <DialogDescription>
-                                  Are you sure you want to delete user "{user.username}"? This action cannot be undone.
-                                </DialogDescription>
-                              </DialogHeader>
-                              <div className="flex justify-end gap-2">
-                                <DialogTrigger asChild>
-                                  <Button variant="outline">Cancel</Button>
-                                </DialogTrigger>
-                                <Button
-                                  variant="destructive"
-                                  onClick={() => deleteUser(user.id, user.username)}
-                                >
-                                  Delete User
-                                </Button>
-                              </div>
-                            </DialogContent>
-                          </Dialog>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                 <Table>
+                   <TableHeader>
+                     <TableRow>
+                       <TableHead>Username</TableHead>
+                       <TableHead>Password</TableHead>
+                       <TableHead>Created</TableHead>
+                       <TableHead>Access Storage</TableHead>
+                       <TableHead>Actions</TableHead>
+                     </TableRow>
+                   </TableHeader>
+                   <TableBody>
+                     {storageUsers.map((user) => (
+                       <TableRow key={user.id}>
+                         <TableCell className="font-medium">{user.username}</TableCell>
+                         <TableCell>
+                           <div className="flex items-center gap-2">
+                             <code className="text-sm bg-gray-100 px-2 py-1 rounded">
+                               {user.password}
+                             </code>
+                             <Button
+                               size="sm"
+                               variant="ghost"
+                               onClick={() => copyToClipboard(user.password)}
+                             >
+                               <Copy className="h-3 w-3" />
+                             </Button>
+                           </div>
+                         </TableCell>
+                         <TableCell>
+                           {new Date(user.created_at).toLocaleDateString()}
+                         </TableCell>
+                         <TableCell>
+                           <Dialog>
+                             <DialogTrigger asChild>
+                               <Button size="sm" className="bg-gradient-primary text-white">
+                                 <Users className="h-3 w-3 mr-1" />
+                                 {user.username}
+                               </Button>
+                             </DialogTrigger>
+                             <DialogContent>
+                               <DialogHeader>
+                                 <DialogTitle>ZeroTier Network Authentication</DialogTitle>
+                                 <DialogDescription>
+                                   Due to security reasons, you must be authenticated with our ZeroTier network to use our service.
+                                 </DialogDescription>
+                               </DialogHeader>
+                               <div className="space-y-4">
+                                 <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                   <p className="text-sm text-yellow-800">
+                                     <strong>Important:</strong> You need to be connected to our ZeroTier network to access your storage.
+                                   </p>
+                                 </div>
+                                 <div className="flex gap-2">
+                                   <Button
+                                     className="flex-1"
+                                     onClick={() => window.open('http://172.26.181.241:8080/web/client', '_blank')}
+                                   >
+                                     I have done this
+                                   </Button>
+                                   <Button
+                                     variant="outline"
+                                     className="flex-1"
+                                     onClick={() => window.open('/zerotier-guide', '_blank')}
+                                   >
+                                     Help me do this
+                                   </Button>
+                                 </div>
+                               </div>
+                             </DialogContent>
+                           </Dialog>
+                         </TableCell>
+                         <TableCell>
+                           <Dialog>
+                             <DialogTrigger asChild>
+                               <Button size="sm" variant="destructive">
+                                 <Trash2 className="h-3 w-3 mr-1" />
+                                 Delete
+                               </Button>
+                             </DialogTrigger>
+                             <DialogContent>
+                               <DialogHeader>
+                                 <DialogTitle>Delete User</DialogTitle>
+                                 <DialogDescription>
+                                   Are you sure you want to delete user "{user.username}"? This action cannot be undone.
+                                 </DialogDescription>
+                               </DialogHeader>
+                               <div className="flex justify-end gap-2">
+                                 <DialogTrigger asChild>
+                                   <Button variant="outline">Cancel</Button>
+                                 </DialogTrigger>
+                                 <Button
+                                   variant="destructive"
+                                   onClick={() => deleteUser(user.id, user.username)}
+                                 >
+                                   Delete User
+                                 </Button>
+                               </div>
+                             </DialogContent>
+                           </Dialog>
+                         </TableCell>
+                       </TableRow>
+                     ))}
+                   </TableBody>
+                 </Table>
                 {storageUsers.length === 0 && (
                   <div className="text-center py-8 text-gray-500">
                     No users created yet. Add your first user above.
