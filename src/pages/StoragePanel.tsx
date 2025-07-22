@@ -45,6 +45,11 @@ export default function StoragePanel() {
   const [newUser, setNewUser] = useState({ username: "", password: "" });
   const [showNewUserPassword, setShowNewUserPassword] = useState(false);
   const [isAddingUser, setIsAddingUser] = useState(false);
+  
+  // Reset loading state on component mount to prevent stuck state
+  useEffect(() => {
+    setIsAddingUser(false);
+  }, []);
   const { toast } = useToast();
 
   const login = async () => {
