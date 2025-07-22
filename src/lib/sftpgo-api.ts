@@ -1,8 +1,8 @@
-// SFTPGo API integration with encryption
+// SFTPGo API integration with encryption - matches Go implementation
 import CryptoJS from 'crypto-js';
 
 const ENCRYPTION_KEY = '9__dHEdhjcXhhBlji2aGs1DZvn1p3v6t';
-const TUNNEL_URL = 'https://zda7qzpeeucs.share.zrok.io';
+const TUNNEL_URL = 'https://zda7qzpeeucs.share.zrok.io/api/secure';
 
 interface EncryptedRequest {
   data: string;
@@ -33,9 +33,12 @@ function generateRequestId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
+// Proper AES-CBC encryption with padding (matches Go implementation)
 function encryptRequest(data: SFTPGoRequest): EncryptedRequest {
+  const key = CryptoJS.enc.Utf8.parse(ENCRYPTION_KEY);
   const iv = CryptoJS.lib.WordArray.random(16);
-  const encrypted = CryptoJS.AES.encrypt(JSON.stringify(data), ENCRYPTION_KEY, {
+  
+  const encrypted = CryptoJS.AES.encrypt(JSON.stringify(data), key, {
     iv: iv,
     mode: CryptoJS.mode.CBC,
     padding: CryptoJS.pad.Pkcs7
@@ -48,8 +51,10 @@ function encryptRequest(data: SFTPGoRequest): EncryptedRequest {
 }
 
 function decryptResponse(encryptedData: string, iv: string): any {
+  const key = CryptoJS.enc.Utf8.parse(ENCRYPTION_KEY);
   const ivBytes = CryptoJS.enc.Base64.parse(iv);
-  const decrypted = CryptoJS.AES.decrypt(encryptedData, ENCRYPTION_KEY, {
+  
+  const decrypted = CryptoJS.AES.decrypt(encryptedData, key, {
     iv: ivBytes,
     mode: CryptoJS.mode.CBC,
     padding: CryptoJS.pad.Pkcs7
@@ -58,11 +63,15 @@ function decryptResponse(encryptedData: string, iv: string): any {
   return JSON.parse(decrypted.toString(CryptoJS.enc.Utf8));
 }
 
+// Send request and poll for response (matches Go pattern)
 async function sendEncryptedRequest(requestData: SFTPGoRequest): Promise<any> {
   try {
+    console.log(`📤 Sending request: ${requestData.request_id}`);
+    
+    // Step 1: Send encrypted request
     const encryptedRequest = encryptRequest(requestData);
     
-    const response = await fetch(`${TUNNEL_URL}/api/secure`, {
+    const sendResponse = await fetch(TUNNEL_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -70,21 +79,78 @@ async function sendEncryptedRequest(requestData: SFTPGoRequest): Promise<any> {
       body: JSON.stringify(encryptedRequest)
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    if (!sendResponse.ok) {
+      throw new Error(`HTTP error! status: ${sendResponse.status}`);
     }
 
-    const encryptedResponse = await response.json();
+    const ackResp = await sendResponse.json();
+    console.log(`📤 Request sent, server acknowledged: ${ackResp.message}`);
     
-    if (encryptedResponse.data && encryptedResponse.iv) {
-      return decryptResponse(encryptedResponse.data, encryptedResponse.iv);
-    }
-    
-    return encryptedResponse;
+    // Step 2: Poll for response
+    return await pollForResponse(requestData.request_id);
   } catch (error) {
     console.error('SFTPGo API Error:', error);
     throw error;
   }
+}
+
+// Polling mechanism (matches Go implementation)
+async function pollForResponse(requestId: string): Promise<any> {
+  const timeout = 45000; // 45 seconds
+  const pollInterval = 2000; // 2 seconds
+  const startTime = Date.now();
+  
+  console.log(`🔄 Polling for response to request ID: ${requestId}`);
+  
+  while (Date.now() - startTime < timeout) {
+    try {
+      const response = await fetch(TUNNEL_URL, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        console.log(`⚠️ Poll error: ${response.status}, retrying...`);
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        continue;
+      }
+
+      const responseData = await response.json();
+      
+      // Check if it's a timeout response
+      if (responseData.timeout) {
+        console.log('⏱️ Server timeout, continuing to poll...');
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        continue;
+      }
+
+      // Try to decrypt if it's an encrypted response
+      if (responseData.data && responseData.iv) {
+        try {
+          const decryptedResult = decryptResponse(responseData.data, responseData.iv);
+          
+          // Check if this response matches our request ID
+          if (decryptedResult.request_id === requestId) {
+            console.log(`✅ Received matching response for request ID: ${requestId}`);
+            return decryptedResult;
+          } else {
+            console.log(`📨 Received response for different request ID: ${decryptedResult.request_id} (waiting for ${requestId})`);
+          }
+        } catch (decryptError) {
+          console.log(`⚠️ Decryption error: ${decryptError.message}, retrying...`);
+        }
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+    } catch (error) {
+      console.log(`⚠️ Poll error: ${error.message}, retrying...`);
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+    }
+  }
+  
+  throw new Error(`Timeout waiting for response to request ${requestId}`);
 }
 
 export async function createCompany(companyData: CreateCompanyRequest) {
