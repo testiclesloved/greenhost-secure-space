@@ -159,6 +159,8 @@ Generated on: ${new Date().toLocaleString()}
   };
 
   const addNewUser = async () => {
+    console.log('🎯 Add User button clicked!');
+    
     if (!newUser.username || !newUser.password) {
       toast({
         title: "Error",
@@ -170,6 +172,11 @@ Generated on: ${new Date().toLocaleString()}
 
     if (!storageAccount) {
       console.error('❌ No storage account found');
+      toast({
+        title: "Error",
+        description: "Storage account not found. Please try logging in again.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -178,7 +185,25 @@ Generated on: ${new Date().toLocaleString()}
     console.log('🔑 API key available:', !!storageAccount.user_purchases?.sftpgo_api_key);
     console.log('👤 Username:', newUser.username);
 
+    // Prevent multiple clicks
+    if (isAddingUser) {
+      console.log('⚠️ Already adding user, ignoring click');
+      return;
+    }
+
     setIsAddingUser(true);
+    
+    // Create timeout to reset loading state if something goes wrong
+    const timeoutId = setTimeout(() => {
+      console.error('⏰ User creation timeout - resetting state');
+      setIsAddingUser(false);
+      toast({
+        title: "Timeout",
+        description: "User creation timed out. Please try again.",
+        variant: "destructive",
+      });
+    }, 60000); // 60 second timeout
+
     try {
       // Check if API key exists
       if (!storageAccount.user_purchases?.sftpgo_api_key) {
@@ -197,7 +222,7 @@ Generated on: ${new Date().toLocaleString()}
 
       console.log('📥 SFTPGo response:', response);
 
-      if (response.success) {
+      if (response && response.success) {
         // Extract data from nested response structure (response.data.data)
         const userData = response.data?.data || response.data;
         console.log('✅ User data extracted:', userData);
@@ -232,17 +257,20 @@ Generated on: ${new Date().toLocaleString()}
         });
       } else {
         console.error('❌ SFTPGo API error:', response);
-        throw new Error(response.message || 'Failed to create user');
+        const errorMessage = response?.message || response?.error || 'Failed to create user - no response from server';
+        throw new Error(errorMessage);
       }
     } catch (error) {
       console.error('❌ Error adding user:', error);
       toast({
-        title: "Error",
+        title: "Error", 
         description: `Failed to add user: ${error.message}`,
         variant: "destructive",
       });
     } finally {
+      clearTimeout(timeoutId);
       setIsAddingUser(false);
+      console.log('🏁 User creation process completed');
     }
   };
 
