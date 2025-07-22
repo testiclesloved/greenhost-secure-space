@@ -41,7 +41,12 @@ export type Database = {
           email: string
           first_name: string | null
           id: string
+          is_locked: boolean | null
+          last_login_at: string | null
           last_name: string | null
+          lock_reason: string | null
+          locked_at: string | null
+          login_attempts: number | null
           role: Database["public"]["Enums"]["user_role"]
           updated_at: string
           user_id: string
@@ -51,7 +56,12 @@ export type Database = {
           email: string
           first_name?: string | null
           id?: string
+          is_locked?: boolean | null
+          last_login_at?: string | null
           last_name?: string | null
+          lock_reason?: string | null
+          locked_at?: string | null
+          login_attempts?: number | null
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
           user_id: string
@@ -61,7 +71,12 @@ export type Database = {
           email?: string
           first_name?: string | null
           id?: string
+          is_locked?: boolean | null
+          last_login_at?: string | null
           last_name?: string | null
+          lock_reason?: string | null
+          locked_at?: string | null
+          login_attempts?: number | null
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
           user_id?: string
@@ -189,6 +204,36 @@ export type Database = {
           },
         ]
       }
+      user_activity_logs: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          id: string
+          ip_address: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_purchases: {
         Row: {
           account_number: string | null
@@ -247,7 +292,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      log_user_activity: {
+        Args: {
+          p_user_id: string
+          p_action: string
+          p_details?: Json
+          p_ip_address?: string
+          p_user_agent?: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       payment_status: "pending" | "confirmed" | "failed"

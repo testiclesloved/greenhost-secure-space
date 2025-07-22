@@ -6,10 +6,29 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Check, X, Settings, Users, DollarSign, Edit3, Save } from "lucide-react";
+import { Loader2, Check, X, Settings, Users, DollarSign, Edit3, Save, Lock, Unlock, Trash2, Search, Eye, Calendar, Activity, AlertTriangle } from "lucide-react";
 import { Header } from "./Header";
+
+interface UserProfile {
+  id: string;
+  user_id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  role: 'user' | 'admin';
+  is_locked: boolean;
+  lock_reason: string | null;
+  locked_at: string | null;
+  last_login_at: string | null;
+  login_attempts: number;
+  created_at: string;
+}
 
 interface PendingPurchase {
   id: string;
@@ -65,6 +84,9 @@ export const AdminPanel = () => {
   const [pendingPurchases, setPendingPurchases] = useState<PendingPurchase[]>([]);
   const [adminKey, setAdminKey] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userProfiles, setUserProfiles] = useState<UserProfile[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [lockReason, setLockReason] = useState("");
   const [settings, setSettings] = useState<AdminSettings>({
     zerotier_network_id: '',
     sftpgo_encryption_key: '',
@@ -94,6 +116,7 @@ export const AdminPanel = () => {
       fetchAdminSettings();
       fetchStoragePlans();
       fetchUserStats();
+      fetchUserProfiles();
     }
   }, [isAuthenticated]);
 
@@ -191,6 +214,127 @@ export const AdminPanel = () => {
       setLoading(false);
     }
   };
+
+  
+  const fetchUserProfiles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setUserProfiles(data || []);
+    } catch (error) {
+      console.error('Error fetching user profiles:', error);
+    }
+  };
+
+  const lockUser = async (userId: string, reason: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          is_locked: true,
+          lock_reason: reason,
+          locked_at: new Date().toISOString()
+        })
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      // Log activity
+      await supabase.rpc('log_user_activity', {
+        p_user_id: userId,
+        p_action: 'account_locked',
+        p_details: { reason }
+      });
+
+      await fetchUserProfiles();
+      toast({
+        title: "User Locked",
+        description: "User account has been locked successfully",
+      });
+    } catch (error) {
+      console.error('Error locking user:', error);
+      toast({
+        title: "Error",
+        description: "Failed to lock user account",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const unlockUser = async (userId: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          is_locked: false,
+          lock_reason: null,
+          locked_at: null
+        })
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      // Log activity
+      await supabase.rpc('log_user_activity', {
+        p_user_id: userId,
+        p_action: 'account_unlocked'
+      });
+
+      await fetchUserProfiles();
+      toast({
+        title: "User Unlocked",
+        description: "User account has been unlocked successfully",
+      });
+    } catch (error) {
+      console.error('Error unlocking user:', error);
+      toast({
+        title: "Error",
+        description: "Failed to unlock user account",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const deleteUser = async (userId: string) => {
+    try {
+      // Delete related records first
+      await supabase.from('user_activity_logs').delete().eq('user_id', userId);
+      await supabase.from('user_purchases').delete().eq('user_id', userId);
+      await supabase.from('storage_accounts').delete().eq('user_id', userId);
+      
+      // Delete profile
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      await fetchUserProfiles();
+      await fetchUserStats();
+      
+      toast({
+        title: "User Deleted",
+        description: "User account and all related data have been deleted",
+      });
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete user account",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const filteredUsers = userProfiles.filter(user =>
+    user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    `${user.first_name} ${user.last_name}`.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const fetchAdminSettings = async () => {
     try {
@@ -818,15 +962,173 @@ export const AdminPanel = () => {
             
             <Card>
               <CardHeader>
-                <CardTitle>User Management</CardTitle>
-                <CardDescription>
-                  Detailed user management features coming soon...
-                </CardDescription>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>User Management</CardTitle>
+                    <CardDescription>
+                      View, lock, unlock, and delete user accounts
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Input
+                        placeholder="Search users..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 w-64"
+                      />
+                    </div>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
-                <p className="text-center py-8 text-muted-foreground">
-                  Advanced user management interface will be available in the next update.
-                </p>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Last Login</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredUsers.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{user.first_name} {user.last_name}</p>
+                            <p className="text-sm text-muted-foreground">ID: {user.id}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell>
+                          <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                            {user.role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {user.is_locked ? (
+                              <Badge variant="destructive" className="flex items-center gap-1">
+                                <Lock className="h-3 w-3" />
+                                Locked
+                              </Badge>
+                            ) : (
+                              <Badge variant="default" className="flex items-center gap-1">
+                                <Unlock className="h-3 w-3" />
+                                Active
+                              </Badge>
+                            )}
+                            {user.lock_reason && (
+                              <span className="text-xs text-muted-foreground" title={user.lock_reason}>
+                                <AlertTriangle className="h-3 w-3" />
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {user.last_login_at 
+                            ? new Date(user.last_login_at).toLocaleDateString()
+                            : 'Never'
+                          }
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {user.is_locked ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => unlockUser(user.user_id)}
+                                className="text-green-600"
+                              >
+                                <Unlock className="h-3 w-3 mr-1" />
+                                Unlock
+                              </Button>
+                            ) : (
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button size="sm" variant="outline" className="text-yellow-600">
+                                    <Lock className="h-3 w-3 mr-1" />
+                                    Lock
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                  <DialogHeader>
+                                    <DialogTitle>Lock User Account</DialogTitle>
+                                    <DialogDescription>
+                                      Provide a reason for locking {user.first_name} {user.last_name}'s account.
+                                    </DialogDescription>
+                                  </DialogHeader>
+                                  <div className="space-y-4">
+                                    <div className="space-y-2">
+                                      <Label htmlFor="lockReason">Lock Reason</Label>
+                                      <Textarea
+                                        id="lockReason"
+                                        value={lockReason}
+                                        onChange={(e) => setLockReason(e.target.value)}
+                                        placeholder="Enter reason for locking this account..."
+                                      />
+                                    </div>
+                                    <div className="flex justify-end gap-2">
+                                      <DialogTrigger asChild>
+                                        <Button variant="outline">Cancel</Button>
+                                      </DialogTrigger>
+                                      <Button
+                                        onClick={() => {
+                                          lockUser(user.user_id, lockReason);
+                                          setLockReason("");
+                                        }}
+                                        className="bg-yellow-600 hover:bg-yellow-700"
+                                      >
+                                        Lock Account
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </DialogContent>
+                              </Dialog>
+                            )}
+                            
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button size="sm" variant="destructive">
+                                  <Trash2 className="h-3 w-3 mr-1" />
+                                  Delete
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete User Account</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete {user.first_name} {user.last_name}'s account? 
+                                    This will permanently delete their profile, purchases, and all related data. 
+                                    This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => deleteUser(user.user_id)}
+                                    className="bg-red-600 hover:bg-red-700"
+                                  >
+                                    Delete Account
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {filteredUsers.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    {searchTerm ? 'No users found matching your search.' : 'No users found.'}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

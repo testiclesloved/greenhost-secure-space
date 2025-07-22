@@ -6,6 +6,86 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Encryption constants (matches Go implementation)
+const ENCRYPTION_KEY = '9__dHEdhjcXhhBlji2aGs1DZvn1p3v6t'
+const TUNNEL_URL = 'https://zda7qzpeeucs.share.zrok.io/api/secure'
+
+// Encryption utilities
+function encryptRequest(data: any): { data: string, iv: string } {
+  // For now using base64 encoding - in production should use proper AES
+  const iv = btoa(Math.random().toString(36))
+  const encrypted = btoa(JSON.stringify(data))
+  
+  return {
+    data: encrypted,
+    iv: iv
+  }
+}
+
+function generateRequestId(): string {
+  return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+}
+
+// Polling function (matches Go pattern)
+async function pollForResponse(requestId: string): Promise<any> {
+  const timeout = 45000 // 45 seconds
+  const pollInterval = 2000 // 2 seconds
+  const startTime = Date.now()
+  
+  console.log(`🔄 Polling for response to request ID: ${requestId}`)
+  
+  while (Date.now() - startTime < timeout) {
+    try {
+      const response = await fetch(TUNNEL_URL, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+
+      if (!response.ok) {
+        console.log(`⚠️ Poll error: ${response.status}, retrying...`)
+        await new Promise(resolve => setTimeout(resolve, pollInterval))
+        continue
+      }
+
+      const responseData = await response.json()
+      
+      // Check if it's a timeout response
+      if (responseData.timeout) {
+        console.log('⏱️ Server timeout, continuing to poll...')
+        await new Promise(resolve => setTimeout(resolve, pollInterval))
+        continue
+      }
+
+      // Try to decrypt if it's an encrypted response
+      if (responseData.data && responseData.iv) {
+        try {
+          // Simple base64 decoding for now
+          const decryptedResult = JSON.parse(atob(responseData.data))
+          
+          // Check if this response matches our request ID
+          if (decryptedResult.request_id === requestId) {
+            console.log(`✅ Received matching response for request ID: ${requestId}`)
+            return decryptedResult
+          } else {
+            console.log(`📨 Received response for different request ID: ${decryptedResult.request_id} (waiting for ${requestId})`)
+          }
+        } catch (decryptError) {
+          console.log(`⚠️ Decryption error: ${decryptError.message}, retrying...`)
+        }
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, pollInterval))
+    } catch (error) {
+      console.log(`⚠️ Poll error: ${error.message}, retrying...`)
+      await new Promise(resolve => setTimeout(resolve, pollInterval))
+    }
+  }
+  
+  throw new Error(`Timeout waiting for response to request ${requestId}`)
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
