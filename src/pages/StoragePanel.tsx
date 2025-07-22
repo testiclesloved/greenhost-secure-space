@@ -64,7 +64,7 @@ export default function StoragePanel() {
         .from('storage_accounts')
         .select(`
           *,
-          user_purchases!inner(sftpgo_api_key)
+          user_purchases(sftpgo_api_key)
         `)
         .eq('account_email', email)
         .eq('account_password', password)
