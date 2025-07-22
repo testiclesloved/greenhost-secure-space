@@ -10,12 +10,14 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Loader2, HardDrive, Network, Download, Copy } from "lucide-react";
 import { ZeroTierGuide } from "./ZeroTierGuide";
+import { addUser as addUserToSFTPGo } from "@/lib/sftpgo-api";
 
 interface StorageAccount {
   id: string;
   account_email: string;
   storage_quota_gb: number;
   setup_completed: boolean;
+  api_key?: string;
 }
 
 interface StorageUser {
@@ -147,13 +149,40 @@ export const UserDashboard = () => {
       return;
     }
 
+    if (!storageAccount?.api_key) {
+      toast({
+        title: "Error",
+        description: "Storage account not properly configured",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setAddingUser(true);
     
     try {
-      // Create mock SFTP links (in production, this would call SFTPGo API)
-      const sftpLink = `sftp://${newUser.username}@storage.greenhost.com:2022`;
-      const webLink = `https://storage.greenhost.com/web/client`;
+      console.log('🚀 Adding user to SFTPGo...');
+      
+      // Call real SFTPGo API
+      const sftpResponse = await addUserToSFTPGo({
+        company_email: storageAccount.account_email,
+        api_key: storageAccount.api_key,
+        username: newUser.username,
+        password: newUser.password
+      });
 
+      console.log('📥 SFTPGo response:', sftpResponse);
+
+      // Extract SFTP and web links from response
+      let sftpLink = '';
+      let webLink = '';
+      
+      if (sftpResponse.success && sftpResponse.data) {
+        sftpLink = sftpResponse.data.sftp_link || `sftp://${newUser.username}@your_server_ip:2022`;
+        webLink = sftpResponse.data.web_link || 'http://your_sftpgo_url/web/client';
+      }
+
+      // Save to database
       const { data, error } = await supabase
         .from('storage_users')
         .insert({
@@ -173,13 +202,13 @@ export const UserDashboard = () => {
       
       toast({
         title: "User added",
-        description: "Storage user has been created successfully",
+        description: "Storage user has been created successfully in SFTPGo",
       });
     } catch (error) {
       console.error('Error adding storage user:', error);
       toast({
         title: "Error",
-        description: "Failed to add storage user",
+        description: `Failed to add storage user: ${error.message}`,
         variant: "destructive"
       });
     } finally {

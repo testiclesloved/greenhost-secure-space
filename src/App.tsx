@@ -13,6 +13,8 @@ import { Security } from "./pages/Security";
 import { Contact } from "./pages/Contact";
 import { Consultation } from "./pages/Consultation";
 import StoragePanel from "./pages/StoragePanel";
+import About from "./pages/About";
+import Features from "./pages/Features";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,6 +44,8 @@ const App = () => (
             <Route path="/contact" element={<Contact />} />
             <Route path="/consultation" element={<Consultation />} />
             <Route path="/storage-panel" element={<StoragePanel />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/features" element={<Features />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

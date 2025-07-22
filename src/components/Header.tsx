@@ -20,9 +20,9 @@ export const Header = () => {
         </Link>
         
         <nav className="hidden md:flex items-center space-x-6">
-          <a href="#features" className="text-foreground hover:text-primary transition-colors">Features</a>
-          <a href="#pricing" className="text-foreground hover:text-primary transition-colors">Pricing</a>
-          <a href="#about" className="text-foreground hover:text-primary transition-colors">About</a>
+          <a href="/features" className="text-foreground hover:text-primary transition-colors">Features</a>
+          <a href="/#pricing" className="text-foreground hover:text-primary transition-colors">Pricing</a>
+          <a href="/about" className="text-foreground hover:text-primary transition-colors">About</a>
         </nav>
         
         <div className="flex items-center space-x-3">
