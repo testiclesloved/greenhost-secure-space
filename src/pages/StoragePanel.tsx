@@ -168,10 +168,23 @@ Generated on: ${new Date().toLocaleString()}
       return;
     }
 
-    if (!storageAccount) return;
+    if (!storageAccount) {
+      console.error('❌ No storage account found');
+      return;
+    }
+
+    console.log('🚀 Starting user creation process...');
+    console.log('📧 Company email:', storageAccount.account_email);
+    console.log('🔑 API key available:', !!storageAccount.user_purchases?.sftpgo_api_key);
+    console.log('👤 Username:', newUser.username);
 
     setIsAddingUser(true);
     try {
+      // Check if API key exists
+      if (!storageAccount.user_purchases?.sftpgo_api_key) {
+        throw new Error('No API key found for this storage account. Please contact support.');
+      }
+
       console.log('🚀 Creating user via SFTPGo API...');
       
       // Call SFTPGo API to add user
@@ -187,6 +200,7 @@ Generated on: ${new Date().toLocaleString()}
       if (response.success) {
         // Extract data from nested response structure (response.data.data)
         const userData = response.data?.data || response.data;
+        console.log('✅ User data extracted:', userData);
         
         // Save user to database
         const { error } = await supabase
@@ -199,8 +213,12 @@ Generated on: ${new Date().toLocaleString()}
             web_link: userData.web_link || 'http://172.26.181.241:8080/web/client',
           });
 
-        if (error) throw error;
+        if (error) {
+          console.error('❌ Database insert error:', error);
+          throw error;
+        }
 
+        console.log('✅ User saved to database');
         await loadStorageUsers(storageAccount.id);
         
         // Download user data file
@@ -213,10 +231,11 @@ Generated on: ${new Date().toLocaleString()}
           description: `User ${newUser.username} has been created and credentials downloaded`,
         });
       } else {
+        console.error('❌ SFTPGo API error:', response);
         throw new Error(response.message || 'Failed to create user');
       }
     } catch (error) {
-      console.error('Error adding user:', error);
+      console.error('❌ Error adding user:', error);
       toast({
         title: "Error",
         description: `Failed to add user: ${error.message}`,

@@ -264,7 +264,6 @@ serve(async (req) => {
         account_email: userEmail,
         account_password: adminPassword,
         storage_quota_gb: purchase.storage_plans.storage_gb,
-        api_key: apiKey,
         setup_completed: true
       })
 
