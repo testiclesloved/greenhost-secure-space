@@ -6,7 +6,12 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Eye, EyeOff, Plus, Trash2, ExternalLink, Copy, Users, Server, HardDrive } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { addUser } from "@/lib/sftpgo-api";
+import { Header } from "@/components/Header";
 
 interface StorageAccount {
   id: string;
@@ -55,6 +60,7 @@ const mockToast = (options) => {
 };
 
 export default function StoragePanel() {
+  const { toast } = useToast();
   const [isAuthenticated, setIsAuthenticated] = useState(true); // Set to true for demo
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -75,6 +81,25 @@ export default function StoragePanel() {
   const [newUser, setNewUser] = useState({ username: "", password: "" });
   const [showNewUserPassword, setShowNewUserPassword] = useState(false);
   const [isAddingUser, setIsAddingUser] = useState(false);
+
+  // Reset isAddingUser state when component mounts or storageAccount changes
+  useEffect(() => {
+    setIsAddingUser(false);
+  }, [storageAccount]);
+
+  const loadStorageUsers = async (accountId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('storage_users')
+        .select('*')
+        .eq('storage_account_id', accountId);
+
+      if (error) throw error;
+      setStorageUsers(data || []);
+    } catch (error) {
+      console.error('Error loading storage users:', error);
+    }
+  };
 
   const login = async () => {
     if (!email || !password) {
