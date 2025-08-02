@@ -2,7 +2,9 @@
 import CryptoJS from 'crypto-js';
 
 const ENCRYPTION_KEY = '9__dHEdhjcXhhBlji2aGs1DZvn1p3v6t';
-const TUNNEL_URL = 'https://zda7qzpeeucs.share.zrok.io/api/secure';
+const TUNNEL_URL = 'http://greenhostservices.app.vtxhub.com/api/secure';
+const RESPONSE_URL = 'http://greenhostservices.app.vtxhub.com/api/response';
+const STATUS_URL = 'http://greenhostservices.app.vtxhub.com/api/status';
 
 interface EncryptedRequest {
   data: string;
@@ -104,7 +106,7 @@ async function pollForResponse(requestId: string): Promise<any> {
   
   while (Date.now() - startTime < timeout) {
     try {
-      const response = await fetch(TUNNEL_URL, {
+      const response = await fetch(RESPONSE_URL, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -225,4 +227,35 @@ export async function healthCheck() {
   };
 
   return sendEncryptedRequest(requestData);
+}
+
+// Simple server status check without encryption
+export async function checkServerStatus(): Promise<{ status: 'online' | 'offline'; message: string }> {
+  try {
+    const response = await fetch(STATUS_URL, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal: AbortSignal.timeout(10000) // 10 second timeout
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        status: 'online',
+        message: data.message || 'Server is online and ready'
+      };
+    } else {
+      return {
+        status: 'offline',
+        message: `Server returned status: ${response.status}`
+      };
+    }
+  } catch (error) {
+    return {
+      status: 'offline',
+      message: error instanceof Error ? error.message : 'Connection failed'
+    };
+  }
 }

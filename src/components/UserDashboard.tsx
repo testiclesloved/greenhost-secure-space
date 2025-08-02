@@ -8,9 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Loader2, HardDrive, Network, Download, Copy } from "lucide-react";
+import { Plus, Loader2, HardDrive, Network, Download, Copy, Wifi, WifiOff } from "lucide-react";
 import { ZeroTierGuide } from "./ZeroTierGuide";
-import { addUser as addUserToSFTPGo } from "@/lib/sftpgo-api";
+import { addUser as addUserToSFTPGo, checkServerStatus } from "@/lib/sftpgo-api";
 
 interface StorageAccount {
   id: string;
@@ -44,11 +44,50 @@ export const UserDashboard = () => {
     username: '',
     password: ''
   });
+  const [serverStatus, setServerStatus] = useState<{status: 'online' | 'offline' | 'checking'; message: string}>({
+    status: 'offline',
+    message: 'Not checked'
+  });
+  const [checkingStatus, setCheckingStatus] = useState(false);
 
   useEffect(() => {
     fetchStorageAccount();
     fetchStorageUsers();
   }, []);
+
+  useEffect(() => {
+    if (storageAccount) {
+      fetchStorageUsers();
+    }
+  }, [storageAccount]);
+
+  const handleServerStatusCheck = async () => {
+    setCheckingStatus(true);
+    setServerStatus({ status: 'checking', message: 'Checking server status...' });
+    
+    try {
+      const status = await checkServerStatus();
+      setServerStatus(status);
+      
+      toast({
+        title: status.status === 'online' ? "Server Online" : "Server Offline",
+        description: status.message,
+        variant: status.status === 'online' ? "default" : "destructive"
+      });
+    } catch (error) {
+      setServerStatus({
+        status: 'offline',
+        message: 'Failed to check server status'
+      });
+      toast({
+        title: "Error",
+        description: "Failed to check server status",
+        variant: "destructive"
+      });
+    } finally {
+      setCheckingStatus(false);
+    }
+  };
 
   const fetchStorageAccount = async () => {
     try {
@@ -435,11 +474,44 @@ export const UserDashboard = () => {
                   </p>
                   <Button
                     onClick={() => setShowZeroTierGuide(true)}
-                    className="w-full bg-gradient-primary"
+                    className="w-full bg-gradient-primary mb-4"
                   >
                     <Download className="w-4 h-4 mr-2" />
                     Setup Network Access
                   </Button>
+                  
+                  <div className="border-t pt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">Server Status</span>
+                      <div className="flex items-center gap-1">
+                        {serverStatus.status === 'online' ? (
+                          <Wifi className="w-4 h-4 text-green-500" />
+                        ) : serverStatus.status === 'offline' ? (
+                          <WifiOff className="w-4 h-4 text-red-500" />
+                        ) : (
+                          <Loader2 className="w-4 h-4 animate-spin text-orange-500" />
+                        )}
+                        <span className={`text-xs ${
+                          serverStatus.status === 'online' ? 'text-green-600' : 
+                          serverStatus.status === 'offline' ? 'text-red-600' : 
+                          'text-orange-600'
+                        }`}>
+                          {serverStatus.status.charAt(0).toUpperCase() + serverStatus.status.slice(1)}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-3">{serverStatus.message}</p>
+                    <Button
+                      onClick={handleServerStatusCheck}
+                      disabled={checkingStatus}
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                    >
+                      {checkingStatus && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Check Server Status
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
