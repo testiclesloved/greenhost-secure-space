@@ -34,6 +34,7 @@ export const UserDashboard = () => {
   const [storageUsers, setStorageUsers] = useState<StorageUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [settingUpAccount, setSettingUpAccount] = useState(false);
+  const [showAddUserForm, setShowAddUserForm] = useState(false);
   const [addingUser, setAddingUser] = useState(false);
   const [showZeroTierGuide, setShowZeroTierGuide] = useState(false);
   const [accountSetup, setAccountSetup] = useState({
@@ -358,7 +359,7 @@ export const UserDashboard = () => {
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg font-semibold">Storage Users</h3>
                     <Button
-                      onClick={() => setAddingUser(!addingUser)}
+                      onClick={() => setShowAddUserForm(!showAddUserForm)}
                       size="sm"
                       className="bg-gradient-primary"
                     >
@@ -367,7 +368,7 @@ export const UserDashboard = () => {
                     </Button>
                   </div>
 
-                  {addingUser && (
+                  {showAddUserForm && (
                     <Card className="border-2 border-primary/20">
                       <CardContent className="pt-4">
                         <div className="grid grid-cols-2 gap-4">
@@ -407,7 +408,7 @@ export const UserDashboard = () => {
                             Create User
                           </Button>
                           <Button
-                            onClick={() => setAddingUser(false)}
+                            onClick={() => setShowAddUserForm(false)}
                             variant="outline"
                           >
                             Cancel

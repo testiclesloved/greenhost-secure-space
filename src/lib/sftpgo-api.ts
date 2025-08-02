@@ -229,11 +229,11 @@ export async function healthCheck() {
   return sendEncryptedRequest(requestData);
 }
 
-// Simple server status check without encryption
+// Simple server status check without encryption - using GET instead of HEAD
 export async function checkServerStatus(): Promise<{ status: 'online' | 'offline'; message: string }> {
   try {
     const response = await fetch(STATUS_URL, {
-      method: 'GET',
+      method: 'GET', // Using GET as HEAD is not supported by the tunnel
       headers: {
         'Content-Type': 'application/json',
       },
@@ -242,10 +242,24 @@ export async function checkServerStatus(): Promise<{ status: 'online' | 'offline
 
     if (response.ok) {
       const data = await response.json();
-      return {
-        status: 'online',
-        message: data.message || 'Server is online and ready'
-      };
+      
+      // Handle nested status structure as shown in the Go example
+      let actualStatus = data;
+      if (data.status && typeof data.status === 'object') {
+        actualStatus = data.status;
+      }
+      
+      if (actualStatus.online === true) {
+        return {
+          status: 'online',
+          message: `Server is online and ready. Queue size: ${actualStatus.queue_size || 'N/A'}`
+        };
+      } else {
+        return {
+          status: 'offline',
+          message: data.message || 'Server status unknown'
+        };
+      }
     } else {
       return {
         status: 'offline',
