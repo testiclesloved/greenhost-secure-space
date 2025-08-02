@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Loader2, HardDrive, Network, Download, Copy, Wifi, WifiOff } from "lucide-react";
 import { ZeroTierGuide } from "./ZeroTierGuide";
-import { addUser as addUserToSFTPGo, checkServerStatus } from "@/lib/sftpgo-api";
+import { addUser as addUserToSFTPGo, createCompany, checkServerStatus } from "@/lib/sftpgo-api";
 
 interface StorageAccount {
   id: string;
@@ -146,7 +146,28 @@ export const UserDashboard = () => {
 
       if (purchaseError) throw purchaseError;
 
-      // Create storage account
+      console.log('🏢 Creating SFTPGo company...');
+      
+      // Create company in SFTPGo first
+      const sftpResponse = await createCompany({
+        company_email: accountSetup.email,
+        quota_gb: purchase.storage_plans.storage_gb,
+        admin_password: accountSetup.password
+      });
+
+      console.log('📥 SFTPGo company response:', sftpResponse);
+
+      // Extract API key from response
+      let apiKey = '';
+      if (sftpResponse.success && sftpResponse.data?.data?.api_key) {
+        apiKey = sftpResponse.data.data.api_key;
+      } else if (sftpResponse.data?.api_key) {
+        apiKey = sftpResponse.data.api_key;
+      } else {
+        throw new Error('Failed to get API key from SFTPGo response');
+      }
+
+      // Create storage account with API key
       const { data, error } = await supabase
         .from('storage_accounts')
         .insert({
@@ -155,6 +176,7 @@ export const UserDashboard = () => {
           account_email: accountSetup.email,
           account_password: accountSetup.password,
           storage_quota_gb: purchase.storage_plans.storage_gb,
+          api_key: apiKey,
           setup_completed: true
         })
         .select()
@@ -165,13 +187,13 @@ export const UserDashboard = () => {
       setStorageAccount(data);
       toast({
         title: "Storage account created",
-        description: "Your storage account has been set up successfully",
+        description: "Your storage account has been set up successfully with SFTPGo",
       });
     } catch (error) {
       console.error('Error setting up storage account:', error);
       toast({
         title: "Error",
-        description: "Failed to set up storage account",
+        description: `Failed to set up storage account: ${error.message}`,
         variant: "destructive"
       });
     } finally {
