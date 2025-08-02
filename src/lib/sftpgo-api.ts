@@ -2,9 +2,18 @@
 import CryptoJS from 'crypto-js';
 
 const ENCRYPTION_KEY = '9__dHEdhjcXhhBlji2aGs1DZvn1p3v6t';
-const TUNNEL_URL = 'http://greenhostservices.app.vtxhub.com/api/secure';
-const RESPONSE_URL = 'http://greenhostservices.app.vtxhub.com/api/response';
-const STATUS_URL = 'http://greenhostservices.app.vtxhub.com/api/status';
+
+// Primary and fallback tunnel URLs
+const PRIMARY_BASE_URL = 'http://greenhostservices.app.vtxhub.com';
+const FALLBACK_BASE_URL = 'https://zda7qzpeeucs.share.zrok.io';
+
+const TUNNEL_URL = `${PRIMARY_BASE_URL}/api/secure`;
+const RESPONSE_URL = `${PRIMARY_BASE_URL}/api/response`;
+const STATUS_URL = `${PRIMARY_BASE_URL}/api/status`;
+
+const FALLBACK_TUNNEL_URL = `${FALLBACK_BASE_URL}/api/secure`;
+const FALLBACK_RESPONSE_URL = `${FALLBACK_BASE_URL}/api/response`;
+const FALLBACK_STATUS_URL = `${FALLBACK_BASE_URL}/api/status`;
 
 interface EncryptedRequest {
   data: string;
@@ -65,48 +74,59 @@ function decryptResponse(encryptedData: string, iv: string): any {
   return JSON.parse(decrypted.toString(CryptoJS.enc.Utf8));
 }
 
-// Send request and poll for response (matches Go pattern)
+// Send request and poll for response (matches Go pattern) with fallback URLs
 async function sendEncryptedRequest(requestData: SFTPGoRequest): Promise<any> {
-  try {
-    console.log(`📤 Sending request: ${requestData.request_id}`);
+  const encryptedRequest = encryptRequest(requestData);
+  const urls = [TUNNEL_URL, FALLBACK_TUNNEL_URL];
+  
+  for (let i = 0; i < urls.length; i++) {
+    const url = urls[i];
+    const isLastAttempt = i === urls.length - 1;
     
-    // Step 1: Send encrypted request
-    const encryptedRequest = encryptRequest(requestData);
-    
-    const sendResponse = await fetch(TUNNEL_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(encryptedRequest)
-    });
+    try {
+      console.log(`📤 Sending request to ${url === TUNNEL_URL ? 'primary' : 'fallback'}: ${requestData.request_id}`);
+      
+      const sendResponse = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(encryptedRequest)
+      });
 
-    if (!sendResponse.ok) {
-      throw new Error(`HTTP error! status: ${sendResponse.status}`);
+      if (!sendResponse.ok) {
+        throw new Error(`HTTP error! status: ${sendResponse.status}`);
+      }
+
+      const ackResp = await sendResponse.json();
+      console.log(`📤 Request sent via ${url === TUNNEL_URL ? 'primary' : 'fallback'}, server acknowledged: ${ackResp.message}`);
+      
+      // Step 2: Poll for response using the same URL base
+      return await pollForResponse(requestData.request_id, url === TUNNEL_URL ? RESPONSE_URL : FALLBACK_RESPONSE_URL);
+    } catch (error) {
+      console.error(`SFTPGo API Error with ${url === TUNNEL_URL ? 'primary' : 'fallback'} URL:`, error);
+      
+      if (isLastAttempt) {
+        throw error;
+      } else {
+        console.log('🔄 Trying fallback URL...');
+        continue;
+      }
     }
-
-    const ackResp = await sendResponse.json();
-    console.log(`📤 Request sent, server acknowledged: ${ackResp.message}`);
-    
-    // Step 2: Poll for response
-    return await pollForResponse(requestData.request_id);
-  } catch (error) {
-    console.error('SFTPGo API Error:', error);
-    throw error;
   }
 }
 
-// Polling mechanism (matches Go implementation)
-async function pollForResponse(requestId: string): Promise<any> {
+// Polling mechanism (matches Go implementation) with fallback URL support
+async function pollForResponse(requestId: string, responseUrl: string = RESPONSE_URL): Promise<any> {
   const timeout = 45000; // 45 seconds
   const pollInterval = 2000; // 2 seconds
   const startTime = Date.now();
   
-  console.log(`🔄 Polling for response to request ID: ${requestId}`);
+  console.log(`🔄 Polling for response to request ID: ${requestId} using ${responseUrl === RESPONSE_URL ? 'primary' : 'fallback'} URL`);
   
   while (Date.now() - startTime < timeout) {
     try {
-      const response = await fetch(RESPONSE_URL, {
+      const response = await fetch(responseUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -229,47 +249,73 @@ export async function healthCheck() {
   return sendEncryptedRequest(requestData);
 }
 
-// Simple server status check without encryption - using GET instead of HEAD
+// Simple server status check without encryption - using GET with fallback URLs
 export async function checkServerStatus(): Promise<{ status: 'online' | 'offline'; message: string }> {
-  try {
-    const response = await fetch(STATUS_URL, {
-      method: 'GET', // Using GET as HEAD is not supported by the tunnel
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      signal: AbortSignal.timeout(10000) // 10 second timeout
-    });
+  const statusUrls = [STATUS_URL, FALLBACK_STATUS_URL];
+  
+  for (let i = 0; i < statusUrls.length; i++) {
+    const url = statusUrls[i];
+    const isLastAttempt = i === statusUrls.length - 1;
+    
+    try {
+      console.log(`🔍 Checking server status via ${url === STATUS_URL ? 'primary' : 'fallback'} URL...`);
+      
+      const response = await fetch(url, {
+        method: 'GET', // Using GET as HEAD is not supported by the tunnel
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: AbortSignal.timeout(10000) // 10 second timeout
+      });
 
-    if (response.ok) {
-      const data = await response.json();
-      
-      // Handle nested status structure as shown in the Go example
-      let actualStatus = data;
-      if (data.status && typeof data.status === 'object') {
-        actualStatus = data.status;
-      }
-      
-      if (actualStatus.online === true) {
-        return {
-          status: 'online',
-          message: `Server is online and ready. Queue size: ${actualStatus.queue_size || 'N/A'}`
-        };
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Handle nested status structure as shown in the Go example
+        let actualStatus = data;
+        if (data.status && typeof data.status === 'object') {
+          actualStatus = data.status;
+        }
+        
+        if (actualStatus.online === true) {
+          return {
+            status: 'online',
+            message: `Server is online and ready via ${url === STATUS_URL ? 'primary' : 'fallback'}. Queue size: ${actualStatus.queue_size || 'N/A'}`
+          };
+        } else {
+          return {
+            status: 'offline',
+            message: data.message || 'Server status unknown'
+          };
+        }
       } else {
+        if (isLastAttempt) {
+          return {
+            status: 'offline',
+            message: `Server returned status: ${response.status}`
+          };
+        } else {
+          console.log(`⚠️ Primary server returned ${response.status}, trying fallback...`);
+          continue;
+        }
+      }
+    } catch (error) {
+      console.error(`Error checking ${url === STATUS_URL ? 'primary' : 'fallback'} server:`, error);
+      
+      if (isLastAttempt) {
         return {
           status: 'offline',
-          message: data.message || 'Server status unknown'
+          message: error instanceof Error ? error.message : 'Connection failed'
         };
+      } else {
+        console.log('🔄 Trying fallback URL...');
+        continue;
       }
-    } else {
-      return {
-        status: 'offline',
-        message: `Server returned status: ${response.status}`
-      };
     }
-  } catch (error) {
-    return {
-      status: 'offline',
-      message: error instanceof Error ? error.message : 'Connection failed'
-    };
   }
+
+  return {
+    status: 'offline',
+    message: 'All servers unreachable'
+  };
 }
