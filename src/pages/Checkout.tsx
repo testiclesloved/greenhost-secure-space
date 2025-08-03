@@ -60,6 +60,7 @@ export const Checkout = () => {
         settingsObj[setting.setting_key] = setting.setting_value;
       });
       
+      console.log('Admin settings fetched:', settingsObj); // Debug log
       setAdminSettings(settingsObj);
     } catch (error) {
       console.error('Error fetching admin settings:', error);
@@ -269,22 +270,28 @@ export const Checkout = () => {
                 </div>
 
                 <div className="space-y-4">
-                  {adminSettings && adminSettings.bank_name && (
+                  {adminSettings && Object.keys(adminSettings).length > 0 && (
                     <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                       <h3 className="font-semibold mb-2 text-blue-900 dark:text-blue-100">Payment Details</h3>
                       <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-blue-800 dark:text-blue-200">Bank Name:</span>
-                          <span className="font-medium text-blue-900 dark:text-blue-100">{adminSettings.bank_name}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-blue-800 dark:text-blue-200">Account Number:</span>
-                          <span className="font-medium text-blue-900 dark:text-blue-100">{adminSettings.account_number}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-blue-800 dark:text-blue-200">Account Name:</span>
-                          <span className="font-medium text-blue-900 dark:text-blue-100">{adminSettings.account_name}</span>
-                        </div>
+                        {adminSettings.bank_name && (
+                          <div className="flex justify-between">
+                            <span className="text-blue-800 dark:text-blue-200">Bank Name:</span>
+                            <span className="font-medium text-blue-900 dark:text-blue-100">{adminSettings.bank_name}</span>
+                          </div>
+                        )}
+                        {adminSettings.account_number && (
+                          <div className="flex justify-between">
+                            <span className="text-blue-800 dark:text-blue-200">Account Number:</span>
+                            <span className="font-medium text-blue-900 dark:text-blue-100">{adminSettings.account_number}</span>
+                          </div>
+                        )}
+                        {adminSettings.account_name && (
+                          <div className="flex justify-between">
+                            <span className="text-blue-800 dark:text-blue-200">Account Name:</span>
+                            <span className="font-medium text-blue-900 dark:text-blue-100">{adminSettings.account_name}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
