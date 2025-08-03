@@ -13,23 +13,15 @@ interface UserProfile {
   zerotier_connected: boolean;
 }
 
-interface AdminSettings {
-  bank_name: string;
-  account_number: string;
-  account_name: string;
-}
-
 export const UserDashboard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [showZeroTierGuide, setShowZeroTierGuide] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [adminSettings, setAdminSettings] = useState<AdminSettings | null>(null);
 
   useEffect(() => {
     fetchUserProfile();
-    fetchAdminSettings();
   }, []);
 
   const fetchUserProfile = async () => {
@@ -46,26 +38,6 @@ export const UserDashboard = () => {
       console.error('Error fetching user profile:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchAdminSettings = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('admin_settings')
-        .select('setting_key, setting_value')
-        .in('setting_key', ['bank_name', 'account_number', 'account_name']);
-
-      if (error) throw error;
-      
-      const settingsObj: any = {};
-      data?.forEach(setting => {
-        settingsObj[setting.setting_key] = setting.setting_value;
-      });
-      
-      setAdminSettings(settingsObj);
-    } catch (error) {
-      console.error('Error fetching admin settings:', error);
     }
   };
 
@@ -130,26 +102,6 @@ export const UserDashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {adminSettings && (
-                <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                  <h3 className="font-semibold mb-2 text-blue-900 dark:text-blue-100">Account Information</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-blue-800 dark:text-blue-200">Bank Name:</span>
-                      <span className="font-medium text-blue-900 dark:text-blue-100">{adminSettings.bank_name}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-blue-800 dark:text-blue-200">Account Number:</span>
-                      <span className="font-medium text-blue-900 dark:text-blue-100">{adminSettings.account_number}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-blue-800 dark:text-blue-200">Account Name:</span>
-                      <span className="font-medium text-blue-900 dark:text-blue-100">{adminSettings.account_name}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               <div className="text-center space-y-4">
                 <div className="bg-gradient-card p-6 rounded-lg">
                   <h3 className="text-xl font-bold mb-2">Access Your Storage Drive</h3>
