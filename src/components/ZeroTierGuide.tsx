@@ -8,9 +8,10 @@ import { X, Copy, Download, Shield, Network, ArrowRight } from "lucide-react";
 
 interface ZeroTierGuideProps {
   onClose: () => void;
+  onConnected?: () => void;
 }
 
-export const ZeroTierGuide = ({ onClose }: ZeroTierGuideProps) => {
+export const ZeroTierGuide = ({ onClose, onConnected }: ZeroTierGuideProps) => {
   const { toast } = useToast();
   const [networkId, setNetworkId] = useState('233ccaac274edbe5');
   const [currentStep, setCurrentStep] = useState(1);
@@ -239,8 +240,17 @@ export const ZeroTierGuide = ({ onClose }: ZeroTierGuideProps) => {
 
           {/* Close Button */}
           <div className="flex justify-end">
-            <Button onClick={onClose} className="bg-gradient-primary">
-              Complete Setup
+            <Button 
+              onClick={() => {
+                if (onConnected && currentStep >= 4) {
+                  onConnected();
+                } else {
+                  onClose();
+                }
+              }} 
+              className="bg-gradient-primary"
+            >
+              {currentStep >= 4 ? 'Access Storage' : 'Complete Setup'}
             </Button>
           </div>
         </CardContent>

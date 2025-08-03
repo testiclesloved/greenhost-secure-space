@@ -50,6 +50,7 @@ export type Database = {
           role: Database["public"]["Enums"]["user_role"]
           updated_at: string
           user_id: string
+          zerotier_connected: boolean | null
         }
         Insert: {
           created_at?: string
@@ -65,6 +66,7 @@ export type Database = {
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
           user_id: string
+          zerotier_connected?: boolean | null
         }
         Update: {
           created_at?: string
@@ -80,6 +82,7 @@ export type Database = {
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
           user_id?: string
+          zerotier_connected?: boolean | null
         }
         Relationships: []
       }
@@ -87,6 +90,7 @@ export type Database = {
         Row: {
           account_email: string
           account_password: string
+          api_key: string | null
           created_at: string
           id: string
           purchase_id: string
@@ -98,6 +102,7 @@ export type Database = {
         Insert: {
           account_email: string
           account_password: string
+          api_key?: string | null
           created_at?: string
           id?: string
           purchase_id: string
@@ -109,6 +114,7 @@ export type Database = {
         Update: {
           account_email?: string
           account_password?: string
+          api_key?: string | null
           created_at?: string
           id?: string
           purchase_id?: string
