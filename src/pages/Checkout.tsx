@@ -269,7 +269,7 @@ export const Checkout = () => {
                 </div>
 
                 <div className="space-y-4">
-                  {adminSettings && (
+                  {adminSettings && adminSettings.bank_name && (
                     <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                       <h3 className="font-semibold mb-2 text-blue-900 dark:text-blue-100">Payment Details</h3>
                       <div className="space-y-2 text-sm">
